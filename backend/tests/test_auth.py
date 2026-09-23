@@ -146,13 +146,33 @@ def test_patch_me_updates_currency(client: TestClient) -> None:
     assert client.get("/api/v1/auth/me", headers=headers).json()["currency"] == "USD"
 
 
-@pytest.mark.parametrize("payload", [{"currency": "EURO"}, {"currency": "E1"}, {"email": "new@example.com"}])
+@pytest.mark.parametrize(
+    "payload",
+    [{"currency": "EURO"}, {"currency": "E1"}, {"currency": "ABC"}, {"email": "new@example.com"}],
+    ids=["too-long", "not-letters", "not-iso-4217", "unknown-field"],
+)
 def test_patch_me_rejects_invalid_payload(client: TestClient, payload: dict[str, str]) -> None:
     register(client)
 
     response = client.patch("/api/v1/auth/me", json=payload, headers=auth_header(login(client)))
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize("payload", [{}, {"currency": "EUR"}], ids=["empty", "same-currency"])
+def test_patch_me_without_changes_does_not_commit(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch, payload: dict[str, str]
+) -> None:
+    register(client)
+    headers = auth_header(login(client))
+    commits: list[None] = []
+    monkeypatch.setattr(db, "commit", lambda: commits.append(None))
+
+    response = client.patch("/api/v1/auth/me", json=payload, headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["currency"] == "EUR"
+    assert commits == []
 
 
 def test_patch_me_requires_authentication(client: TestClient) -> None:

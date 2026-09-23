@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, StringConstraints
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field
+from pydantic_extra_types.currency_code import ISO4217
 
 
 def _lowercase(value: str) -> str:
@@ -10,8 +11,8 @@ def _lowercase(value: str) -> str:
 
 # Emails are compared case-insensitively: always store and look them up lowercased.
 Email = Annotated[EmailStr, AfterValidator(_lowercase)]
-# ISO 4217 alphabetic code, e.g. EUR or USD. Lowercase input is accepted and uppercased.
-CurrencyCode = Annotated[str, StringConstraints(strip_whitespace=True, to_upper=True, pattern=r"^[A-Za-z]{3}$")]
+# ISO 4217 alphabetic code, e.g. EUR or USD, checked against pycountry's list. Lowercase input is uppercased.
+CurrencyCode = ISO4217
 # Argon2 handles any length; the upper bound only stops absurdly large request bodies from being hashed.
 Password = Annotated[str, Field(min_length=8, max_length=128)]
 

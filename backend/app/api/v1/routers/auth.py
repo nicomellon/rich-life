@@ -42,5 +42,6 @@ def read_me(user: CurrentUser) -> UserRead:
 def update_me(payload: UserUpdate, user: CurrentUser, db: DbSession) -> UserRead:
     if payload.currency is not None:
         user.currency = payload.currency
-    db.commit()
+    if db.is_modified(user):
+        db.commit()
     return UserRead.model_validate(user)
