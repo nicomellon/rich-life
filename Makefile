@@ -18,11 +18,20 @@ setup: .env ## Install git hooks, backend dependencies and create .env from .env
 	cp .env.example .env
 
 .PHONY: dev
-dev: db backend ## Start everything needed for local development
+dev: db migrate backend ## Start everything needed for local development
 
 .PHONY: backend
 backend: .env ## Run the API with auto-reload on http://localhost:8000
 	$(BACKEND) uv run --env-file ../.env uvicorn app.main:app --reload
+
+.PHONY: migrate
+migrate: .env ## Apply database migrations (alembic upgrade head)
+	$(BACKEND) uv run --env-file ../.env alembic upgrade head
+
+.PHONY: migration
+migration: .env ## Autogenerate a migration from model changes, e.g. make migration m="add users table"
+	@test -n "$(m)" || { echo 'Usage: make migration m="describe the change"'; exit 1; }
+	$(BACKEND) uv run --env-file ../.env alembic revision --autogenerate -m "$(m)"
 
 .PHONY: db
 db: ## Start Postgres in the background and wait until it's ready
