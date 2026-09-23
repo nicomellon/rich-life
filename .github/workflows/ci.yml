@@ -40,7 +40,7 @@ jobs:
     # The app reads its settings from the environment only.
     env:
       DATABASE_URL: postgresql+psycopg://richlife:richlife@localhost:5432/richlife
-      JWT_SECRET: ci-secret
+      JWT_SECRET: ci-secret-that-is-at-least-32-characters-long
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Annotated
 
-from pydantic import SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -14,7 +14,10 @@ class Settings(BaseSettings):
     # Set by the build or deploy pipeline (e.g. a git tag or commit SHA); shown in /docs and /health.
     app_version: str = "dev"
     database_url: str = "postgresql+psycopg://richlife:richlife@localhost:5432/richlife"
-    jwt_secret: SecretStr
+    # HS256 key; RFC 7518 asks for at least 256 bits.
+    jwt_secret: Annotated[SecretStr, Field(min_length=32)]
+    # There are no refresh tokens in the MVP, so this is how long a login lasts.
+    access_token_expire_minutes: int = 60 * 24 * 7
     # Comma-separated in the environment, e.g. CORS_ORIGINS=http://localhost:5173,https://app.example.com
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
 
