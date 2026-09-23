@@ -26,11 +26,13 @@ A personal finance app for planning and tracking monthly spending. Each month's 
 ## Getting started
 
 ```sh
-make setup   # install the git hooks and backend dependencies, and create .env from .env.example
+make setup   # install the git hooks and dependencies, and create .env from .env.example
 make db      # start PostgreSQL and wait until it's ready
 make migrate # apply the database migrations
-make backend # run the API on http://localhost:8000
+make dev     # run the API on http://localhost:8000 and the web app on http://localhost:5173
 ```
+
+`make backend` and `make frontend` run either one on its own.
 
 Run `make help` to see every command.
 
@@ -60,12 +62,12 @@ To change the port or credentials, edit `.env`. If you change the user or databa
 
 ### Frontend
 
-Not scaffolded yet; see #4. It will run on http://localhost:5173.
+`make frontend` runs the web app with hot reload on http://localhost:5173. It calls the API on its own origin under `/api`, which the dev server passes through to the backend. See [frontend/README.md](frontend/README.md) for configuration, layout and checks.
 
 ## Common commands
 
 | Command | What it does |
 |---|---|
-| `make dev` | Start the database, apply the migrations and run the API |
+| `make dev` | Start the database, apply the migrations, and run the API and the web app |
 | `make test` | Run all tests |
 | `make lint` | Run all linters and formatting checks |

@@ -1,0 +1,5 @@
+dist
+coverage
+package-lock.json
+# Markdown follows the repository-wide style rather than Prettier's.
+*.md
