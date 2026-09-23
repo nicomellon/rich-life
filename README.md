@@ -28,6 +28,7 @@ A personal finance app for planning and tracking monthly spending. Each month's 
 ```sh
 make setup   # install the git hooks and backend dependencies, and create .env from .env.example
 make db      # start PostgreSQL and wait until it's ready
+make migrate # apply the database migrations
 make backend # run the API on http://localhost:8000
 ```
 
@@ -44,6 +45,8 @@ postgresql://richlife:richlife@localhost:5432/richlife
 | Command | What it does |
 |---|---|
 | `make db` | Start Postgres (same as `docker compose up -d db`) |
+| `make migrate` | Apply the migrations (`alembic upgrade head`) |
+| `make migration m="..."` | Autogenerate a migration from model changes |
 | `make db-shell` | Open `psql` in the database |
 | `make db-stop` | Stop the containers, keeping the data |
 | `make db-reset` | Delete all data and start a fresh database |
@@ -63,6 +66,6 @@ Not scaffolded yet; see #4. It will run on http://localhost:5173.
 
 | Command | What it does |
 |---|---|
-| `make dev` | Start the database and the API |
+| `make dev` | Start the database, apply the migrations and run the API |
 | `make test` | Run all tests |
 | `make lint` | Run all linters and formatting checks |
