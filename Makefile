@@ -1,20 +1,28 @@
 # Developer commands for the whole monorepo. Run `make help` to list them.
-# The backend (#2) and frontend (#4) add their own dev, test and lint steps here.
+# The frontend (#4) adds its own dev, test and lint steps here.
 
 .DEFAULT_GOAL := help
 COMPOSE := docker compose
+BACKEND := cd backend &&
 
 .PHONY: help
 help: ## List available commands
 	@grep -hE '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: setup
-setup: ## Install git hooks and create .env from .env.example
+setup: .env ## Install git hooks, backend dependencies and create .env from .env.example
 	pre-commit install
-	@test -f .env || (cp .env.example .env && echo "Created .env from .env.example")
+	$(BACKEND) uv sync
+
+.env:
+	cp .env.example .env
 
 .PHONY: dev
-dev: db ## Start everything needed for local development
+dev: db backend ## Start everything needed for local development
+
+.PHONY: backend
+backend: .env ## Run the API with auto-reload on http://localhost:8000
+	$(BACKEND) uv run --env-file ../.env uvicorn app.main:app --reload
 
 .PHONY: db
 db: ## Start Postgres in the background and wait until it's ready
@@ -40,7 +48,9 @@ pgadmin: ## Start pgAdmin on http://localhost:5050 (with the database)
 .PHONY: test
 test: ## Run all tests
 	python3 -m unittest discover -s scripts/tests
+	$(BACKEND) uv run pytest
 
 .PHONY: lint
-lint: ## Run all linters and formatting checks
+lint: ## Run all linters, formatting and type checks
 	pre-commit run --all-files
+	$(BACKEND) uv run mypy
