@@ -53,7 +53,7 @@ Derived per month (computed on the fly, not stored): for each bucket, `target_am
 - AC: `alembic upgrade head` runs against the Docker Postgres.
 
 **#4 Frontend skeleton (Vite + React + TS)** — depends on #1
-- Vite React TS, React Router, TanStack Query, a UI library (shadcn/ui + Tailwind recommended), ESLint + Prettier, and Vitest + React Testing Library. Add an API client module (a `fetch` wrapper with a base URL from `VITE_API_URL` that attaches the auth token) and an app shell layout.
+- Vite React TS, React Router, TanStack Query, a UI library (shadcn/ui + Tailwind recommended), ESLint + Prettier, and Vitest + React Testing Library. Add an API client module (a `fetch` wrapper that calls `/api/v1` on the app's own origin, proxied to the backend by the dev server, and attaches the auth token) and an app shell layout.
 - AC: `npm run dev` shows the shell, and `npm test` and `npm run lint` pass.
 
 **#5 CI (GitHub Actions)** — depends on #2, #4
@@ -122,7 +122,7 @@ Derived per month (computed on the fly, not stored): for each bucket, `target_am
 - Happy path: register → set the plan → create a month → add entries → check the dashboard numbers.
 
 **#20 Containerisation and deployment**
-- Dockerfiles for the backend (running Alembic migrations on start) and the frontend (static build served by nginx or Caddy), a production compose file, and deploy docs (e.g. Fly.io, Render, or a VPS).
+- Dockerfiles for the backend (running Alembic migrations on start) and the frontend (static build served by nginx or Caddy, which also proxies `/api` to the backend so the app stays same-origin), a production compose file, and deploy docs (e.g. Fly.io, Render, or a VPS).
 
 ### Out of scope for the MVP (possible future issues)
 Recurring expenses, sub-categories within buckets, several income line items, bank import or CSV, multiple currencies, trends across months, refresh tokens, and password reset.
