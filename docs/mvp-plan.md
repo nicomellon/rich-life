@@ -35,6 +35,10 @@ Derived per month (computed on the fly, not stored): for each bucket, `target_am
 
 ## Milestone 0 — Foundations
 
+**#21 Enforce commit message conventions** (done first)
+- Commit, branch and pull request conventions checked by pre-commit hooks and a required CI check, with squash-only merges into a protected `main`. See `CONTRIBUTING.md`.
+- AC: badly formed commits are rejected locally, badly formed PRs fail CI and can't be merged, and each merged PR becomes one conventional squash commit that closes its issue.
+
 **#1 Monorepo scaffolding and dev environment**
 - Create `backend/`, `frontend/`, root `docker-compose.yml` (Postgres 16 plus an optional pgAdmin), `.editorconfig`, `.gitignore`, and a README with setup steps. Add a root `Makefile` or `justfile` (`make dev`, `make test`, `make lint`).
 - AC: `docker compose up db` starts Postgres, and the README explains how to run both apps.
@@ -126,7 +130,7 @@ Recurring expenses, sub-categories within buckets, several income line items, ba
 ---
 
 ## Suggested order and parallel work
-#1 → (#2 → #3 → #6 → #8 → #10 → #11 → #12) running alongside (#4 → #7). After that: #9, #13, #14, #15, #16, then Milestone 4. #5 (CI) should be done early, right after #2 and #4.
+#21 → #1 → (#2 → #3 → #6 → #8 → #10 → #11 → #12) running alongside (#4 → #7). After that: #9, #13, #14, #15, #16, then Milestone 4. #5 (CI) should be done early, right after #2 and #4.
 
 ## Verification (end-to-end, once implemented)
 1. `docker compose up db`, then `cd backend && alembic upgrade head && uvicorn app.main:app --reload`

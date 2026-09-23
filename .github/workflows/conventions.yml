@@ -1,0 +1,32 @@
+name: Conventions
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  conventions:
+    # This job name is the required status check on `main`; see scripts/configure_repo.sh.
+    name: Commit conventions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test the convention checker
+        run: python -m unittest discover -s scripts/tests
+      - name: Check branch, PR title, PR description and commits
+        # Untrusted PR fields are passed through env vars, never interpolated into the script.
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python scripts/commit_conventions.py check-pr
