@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "rich-life (local)",
+      "Group": "Servers",
+      "Host": "db",
+      "Port": 5432,
+      "MaintenanceDB": "richlife",
+      "Username": "richlife",
+      "SSLMode": "prefer"
+    }
+  }
+}
