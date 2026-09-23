@@ -1,8 +1,24 @@
 # Install once per clone:  pre-commit install
-# Hooks enforce the commit conventions in CONTRIBUTING.md; CI runs the same checks.
+# File checks run before each commit; the message hooks enforce the conventions
+# in CONTRIBUTING.md, which CI checks again on every pull request.
 default_install_hook_types: [pre-commit, prepare-commit-msg, commit-msg]
+# Hooks only run on file changes unless they set their own stages.
+default_stages: [pre-commit, manual]
 
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: detect-private-key
+
   - repo: local
     hooks:
       - id: prepare-commit-msg
