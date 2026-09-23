@@ -4,7 +4,8 @@
 set -euo pipefail
 
 REPO="${REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
-CHECK="Commit conventions"  # job name in .github/workflows/conventions.yml
+# Job names in .github/workflows/conventions.yml and .github/workflows/ci.yml
+CHECKS='"Commit conventions", "Backend", "Frontend"'
 
 echo "Configuring merge settings for $REPO"
 gh api --method PATCH "repos/$REPO" --silent \
@@ -18,7 +19,7 @@ gh api --method PATCH "repos/$REPO" --silent \
 echo "Protecting main"
 gh api --method PUT "repos/$REPO/branches/main/protection" --silent --input - <<JSON
 {
-  "required_status_checks": { "strict": true, "contexts": ["$CHECK"] },
+  "required_status_checks": { "strict": true, "contexts": [$CHECKS] },
   "enforce_admins": true,
   "required_pull_request_reviews": { "required_approving_review_count": 0 },
   "restrictions": null,

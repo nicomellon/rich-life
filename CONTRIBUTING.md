@@ -1,6 +1,6 @@
 # Contributing
 
-Every change is tracked by a GitHub issue, made on its own branch, and merged into `main` through a pull request. These rules are checked locally by pre-commit hooks and in CI by the **Commit conventions** check, which `main` requires.
+Every change is tracked by a GitHub issue, made on its own branch, and merged into `main` through a pull request. These rules are checked locally by pre-commit hooks and in CI by the **Commit conventions** check. The **Backend** and **Frontend** checks run the same linters, type checks and tests as `make lint` and `make test`. `main` requires all three.
 
 ## Setup
 
@@ -54,4 +54,4 @@ The pull request title follows the same subject rules, and the description follo
 
 ## Repository settings
 
-`scripts/configure_repo.sh` applies the GitHub settings these rules rely on: squash merge only (using the PR title and description as the commit message), branches deleted after merge, and `main` protected so it only accepts pull requests that pass the **Commit conventions** check, with linear history and no direct or force pushes, for admins too.
+`scripts/configure_repo.sh` applies the GitHub settings these rules rely on: squash merge only (using the PR title and description as the commit message), branches deleted after merge, and `main` protected so it only accepts pull requests that pass the **Commit conventions**, **Backend** and **Frontend** checks, with linear history and no direct or force pushes, for admins too.
