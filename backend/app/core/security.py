@@ -1,24 +1,10 @@
 from datetime import UTC, datetime, timedelta
 
 import jwt
-from pwdlib import PasswordHash
 
 from app.core.config import get_settings
 
 JWT_ALGORITHM = "HS256"
-
-# Argon2id with pwdlib's recommended parameters.
-password_hash = PasswordHash.recommended()
-
-
-def hash_password(password: str) -> str:
-    return password_hash.hash(password)
-
-
-def verify_password(password: str, hashed: str) -> tuple[bool, str | None]:
-    """Check `password` against `hashed`. The second value is a new hash to store when `hashed` uses outdated
-    parameters, otherwise None."""
-    return password_hash.verify_and_update(password, hashed)
 
 
 def create_access_token(subject: str) -> str:

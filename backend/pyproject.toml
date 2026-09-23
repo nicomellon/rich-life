@@ -7,13 +7,13 @@ dependencies = [
     "alembic>=1.20.0",
     "fastapi>=0.141.1",
     "psycopg[binary]>=3.2",
-    "pwdlib[argon2]>=0.3.1",
     "pydantic-extra-types[pycountry]>=2.11.1",
     "pydantic-settings>=2.15.0",
     "pydantic[email]>=2.13.5",
     "pyjwt>=2.15.0",
     "sqlalchemy>=2.0",
     "uvicorn[standard]>=0.53.0",
+    "webauthn>=3.0.0",
 ]
 
 [tool.uv]
