@@ -12,3 +12,8 @@ Follow these rules in every change. Reviewers reject code that breaks them.
 
 1. Run `make lint` and `make test` (the backend tests need `make db`).
 2. Have the `code-style-reviewer` agent review the diff, and fix what it reports. It covers the rules no linter can check: names, one scenario per test, and domain types.
+
+## Agent workflow
+
+1. **Plan:** ask the `product-designer` agent to plan a feature. It asks about open product decisions and, once you confirm, writes the GitHub issues with tasks, acceptance criteria and dependencies.
+2. **Deliver:** run `/deliver-issues 12 13` (or `/deliver-issues` to pick from the open issues). For each issue, in dependency order, the `implementer` builds it on its own branch, `code-style-reviewer` and `correctness-reviewer` review the diff before it's committed, the implementer opens the pull request, `spec-reviewer` checks it against the issue on GitHub, and the implementer resolves the feedback and squash merges once CI is green.
