@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.db.session import get_db
+from app.models.entry import Entry
 from app.models.month import Month
 from app.models.user import User
-from app.services import months
+from app.services import entries, months
 
 # Shared dependencies for route handlers, e.g. `def list_months(db: DbSession) -> ...`.
 DbSession = Annotated[Session, Depends(get_db)]
@@ -58,3 +59,21 @@ def get_requested_month(
 
 
 RequestedMonth = Annotated[Month, Depends(get_requested_month)]
+
+# The largest id a Postgres INTEGER column holds: a larger one would fail the query
+# instead of finding nothing.
+MAX_ID = 2**31 - 1
+
+
+def get_requested_entry(
+    entry_id: Annotated[int, Path(ge=1, le=MAX_ID)], user: CurrentUser, db: DbSession
+) -> Entry:
+    """The signed-in user's entry from the path. Responds 404 if they don't have it,
+    including when it belongs to another user."""
+    requested_entry = entries.find_entry(db, user, entry_id)
+    if requested_entry is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Entry not found")
+    return requested_entry
+
+
+RequestedEntry = Annotated[Entry, Depends(get_requested_entry)]
