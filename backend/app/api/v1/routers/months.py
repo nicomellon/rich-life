@@ -1,0 +1,107 @@
+from datetime import MAXYEAR, MINYEAR
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
+
+from app.api.deps import CurrentUser, DbSession
+from app.models.month import Month
+from app.schemas.month import MonthCreate, MonthRead, MonthUpdate
+from app.schemas.spending_plan import SpendingPlanPercentages
+from app.services import months
+
+router = APIRouter(prefix="/months", tags=["months"])
+
+
+def get_requested_month(
+    year: Annotated[int, Path(ge=MINYEAR, le=MAXYEAR)],
+    month: Annotated[int, Path(ge=1, le=12)],
+    user: CurrentUser,
+    db: DbSession,
+) -> Month:
+    """The signed-in user's month from the path. Responds 404 if they don't have it."""
+    requested_month = months.find_month(db, user, year, month)
+    if requested_month is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Month not found")
+    return requested_month
+
+
+RequestedMonth = Annotated[Month, Depends(get_requested_month)]
+
+
+@router.get("", summary="List the months")
+def list_months(user: CurrentUser, db: DbSession) -> list[MonthRead]:
+    """The user's months, newest first."""
+    return [MonthRead.model_validate(month) for month in months.list_months(db, user)]
+
+
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    summary="Start a month",
+    responses={status.HTTP_409_CONFLICT: {"description": "Month already exists"}},
+)
+def create_month(new_month: MonthCreate, user: CurrentUser, db: DbSession) -> MonthRead:
+    """Its targets are copied from the current spending plan, so later changes to the
+    plan leave this month unchanged."""
+    try:
+        created_month = months.create_month(db, user, new_month)
+    except months.MonthAlreadyExistsError:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, detail="Month already exists"
+        ) from None
+    return MonthRead.model_validate(created_month)
+
+
+@router.get(
+    "/{year}/{month}",
+    summary="Get a month",
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Month not found"}},
+)
+def read_month(requested_month: RequestedMonth) -> MonthRead:
+    return MonthRead.model_validate(requested_month)
+
+
+@router.patch(
+    "/{year}/{month}",
+    summary="Change a month's income",
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Month not found"}},
+)
+def update_month(
+    month_update: MonthUpdate, requested_month: RequestedMonth, db: DbSession
+) -> MonthRead:
+    requested_month.income = month_update.income
+    db.commit()
+    return MonthRead.model_validate(requested_month)
+
+
+@router.put(
+    "/{year}/{month}/targets",
+    summary="Replace a month's targets",
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Month not found"}},
+)
+def update_month_targets(
+    new_targets: SpendingPlanPercentages,
+    requested_month: RequestedMonth,
+    db: DbSession,
+) -> MonthRead:
+    """Takes a percentage for every bucket; they must add up to 100. Only this month
+    changes: the spending plan and other months keep their targets."""
+    requested_month.fixed_costs_pct = new_targets.fixed_costs_pct
+    requested_month.investments_pct = new_targets.investments_pct
+    requested_month.savings_pct = new_targets.savings_pct
+    requested_month.guilt_free_pct = new_targets.guilt_free_pct
+    db.commit()
+    return MonthRead.model_validate(requested_month)
+
+
+@router.delete(
+    "/{year}/{month}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a month",
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Month not found"}},
+)
+def delete_month(requested_month: RequestedMonth, db: DbSession) -> Response:
+    """Everything recorded in the month is deleted with it."""
+    db.delete(requested_month)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
