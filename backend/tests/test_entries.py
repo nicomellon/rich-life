@@ -276,7 +276,10 @@ def test_create_entry_in_another_users_month_returns_404(
 ) -> None:
     response = post_entry(client, other_user_headers, RENT)
 
-    assert response.status_code == 404
+    assert (response.status_code, response.json()) == (
+        404,
+        {"detail": "Month not found"},
+    )
 
 
 # Listing a month's entries
@@ -372,7 +375,10 @@ def test_list_another_users_entries_returns_404(
 ) -> None:
     response = client.get(SEPTEMBER_ENTRIES_PATH, headers=other_user_headers)
 
-    assert response.status_code == 404
+    assert (response.status_code, response.json()) == (
+        404,
+        {"detail": "Month not found"},
+    )
 
 
 # Changing an entry
