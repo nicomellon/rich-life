@@ -24,12 +24,10 @@ def _percentage_column(default_pct: int) -> Mapped[Decimal]:
     )
 
 
-class SpendingPlan(Base):
-    """A user's default plan: the share of each month's income, in percent, that each
-    bucket targets. Every user has one, created when they register."""
-
-    __tablename__ = "spending_plans"
-    __table_args__ = (
+def percentage_check_constraints() -> tuple[CheckConstraint, ...]:
+    """Check constraints for a table with a `<bucket>_pct` column per bucket: each is
+    between 0 and 100, and together they add up to 100."""
+    return (
         *(
             CheckConstraint(
                 f"{bucket}_pct >= 0 AND {bucket}_pct <= 100", name=f"{bucket}_pct"
@@ -41,6 +39,14 @@ class SpendingPlan(Base):
             name="total_pct",
         ),
     )
+
+
+class SpendingPlan(Base):
+    """A user's default plan: the share of each month's income, in percent, that each
+    bucket targets. Every user has one, created when they register."""
+
+    __tablename__ = "spending_plans"
+    __table_args__ = percentage_check_constraints()
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
