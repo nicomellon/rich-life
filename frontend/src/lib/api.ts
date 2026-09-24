@@ -1,4 +1,4 @@
-import { getAccessToken } from '@/lib/auth-token'
+import { clearAccessToken, getAccessToken } from '@/lib/auth-token'
 
 // Same origin as the app: the dev server (vite.config.ts) or, in production, the web server
 // serving the build passes /api through to the backend.
@@ -43,6 +43,9 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 
   const payload = await readBody(response)
   if (!response.ok) {
+    // The token has expired or its account is gone. Forgetting it signs the user out, and the
+    // route guards send them to the sign-in page.
+    if (response.status === 401 && token) clearAccessToken()
     const detail = isObject(payload) && 'detail' in payload ? payload.detail : payload
     throw new ApiError(response.status, detail)
   }

@@ -149,6 +149,17 @@ def test_register_challenge_requires_user_verification(client: TestClient) -> No
     assert options.authenticator_selection.user_verification == "required"
 
 
+def test_register_challenge_leaves_out_the_unset_authenticator_attachment(
+    client: TestClient,
+) -> None:
+    options = request_registration_options(client)
+
+    assert (
+        "authenticator_attachment"
+        not in options.authenticator_selection.model_fields_set
+    )
+
+
 @pytest.mark.parametrize(
     "email", [EMAIL, "ADA@example.com"], ids=["same-case", "other-case"]
 )
