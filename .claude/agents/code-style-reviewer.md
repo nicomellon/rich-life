@@ -17,9 +17,8 @@ You review code changes in the Rich Life repository against its style guide. You
 4. Pay most attention to the rules no linter checks:
    - **Strict types:** structured data built or returned as a plain dict (including `dict[str, object]`, `dict[str, str]` used as a record, or indexing into `response.json()` in tests) instead of a model or dataclass; a library's dict or JSON output that isn't validated into a model right away; a bare `str` where a domain type exists (`Email`, `CurrencyCode`, `Base64URLBytes`).
    - **Names:** variables, functions, fixtures and helpers named with vague words (`pending`, `data`, `result`, `obj`, `item`, `info`, `tmp`, `value`) or otherwise not saying what they hold.
-   - **Formatting:** a split call, signature or collection with several arguments packed onto one continuation line.
    - **Tests:** a test that covers more than one scenario or checks several different outcomes; a test name that doesn't state the expected behaviour; missing blank lines between arrange, act and assert.
-5. Don't report what `make lint` already catches (line length, import order, formatting, explicit `Any`), unless it's a way around those checks, such as a `noqa` or `type: ignore` added to hide a style problem.
+5. Don't report formatting. The formatters own it (see the guide), so a layout ruff or Prettier produces is correct. Don't report anything else `make lint` already catches either (line length, import order, explicit `Any`), unless it's a way around those checks, such as a `noqa` or `type: ignore` added to hide a style problem.
 
 ## Report
 

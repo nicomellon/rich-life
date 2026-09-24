@@ -32,7 +32,9 @@ def _token_for(user: User) -> Token:
     summary="Start registering a passkey for a new account",
     responses={status.HTTP_409_CONFLICT: {"description": "Email already registered"}},
 )
-def register_challenge(payload: RegistrationChallengeRequest, db: DbSession) -> RegistrationOptions:
+def register_challenge(
+    payload: RegistrationChallengeRequest, db: DbSession
+) -> RegistrationOptions:
     """Returns the options to pass to `navigator.credentials.create()`."""
     try:
         return passkeys.start_registration(db, email=payload.email)
@@ -50,7 +52,8 @@ def register_challenge(payload: RegistrationChallengeRequest, db: DbSession) -> 
     },
 )
 def verify_registration(registration: RegistrationResponse, db: DbSession) -> Token:
-    """Takes the credential `navigator.credentials.create()` returned and signs the new user in."""
+    """Takes the credential `navigator.credentials.create()` returned and signs the
+    new user in."""
     try:
         user = passkeys.finish_registration(db, registration)
     except passkeys.PasskeyVerificationError:
@@ -69,7 +72,9 @@ def login_challenge(db: DbSession) -> AuthenticationOptions:
 @router.post(
     "/verify-login",
     summary="Sign in with a passkey",
-    responses={status.HTTP_401_UNAUTHORIZED: {"description": "Passkey verification failed"}},
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Passkey verification failed"}
+    },
 )
 def verify_login(authentication: AuthenticationResponse, db: DbSession) -> Token:
     """Takes the assertion `navigator.credentials.get()` returned."""

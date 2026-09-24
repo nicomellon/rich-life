@@ -5,14 +5,14 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr
 from pydantic_extra_types.currency_code import ISO4217
 
 
-def _lowercase(value: str) -> str:
-    return value.lower()
+def _lowercase_email(email: str) -> str:
+    return email.lower()
 
 
 # Emails are compared case-insensitively: always store and look them up lowercased.
-Email = Annotated[EmailStr, AfterValidator(_lowercase)]
-# ISO 4217 alphabetic code, e.g. EUR or USD, checked against pycountry's list. Lowercase input is
-# uppercased.
+Email = Annotated[EmailStr, AfterValidator(_lowercase_email)]
+# ISO 4217 alphabetic code, e.g. EUR or USD, checked against pycountry's list. Lowercase
+# input is uppercased.
 CurrencyCode = ISO4217
 
 

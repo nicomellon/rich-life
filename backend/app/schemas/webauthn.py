@@ -1,13 +1,20 @@
 """WebAuthn options and credentials in the JSON shapes of the browser API
 (PublicKeyCredentialCreationOptionsJSON, RegistrationResponseJSON and so on), which
-@simplewebauthn/browser consumes and produces. Binary values travel as unpadded base64url strings
-and are bytes in Python."""
+@simplewebauthn/browser consumes and produces. Binary values travel as unpadded
+base64url strings and are bytes in Python."""
 
 import base64
 import binascii
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, WithJsonSchema
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    WithJsonSchema,
+)
 from pydantic.alias_generators import to_camel
 from webauthn.helpers import bytes_to_base64url
 from webauthn.helpers.structs import (
@@ -17,12 +24,13 @@ from webauthn.helpers.structs import (
 )
 
 
-def _decode_base64url(value: object) -> object:
-    """Decode unpadded base64url strictly; py_webauthn's base64url_to_bytes silently drops invalid
-    characters. Bytes pass through, so models can also be built in Python."""
-    if not isinstance(value, str):
-        return value
-    padded = value + "=" * (-len(value) % 4)
+def _decode_base64url(encoded: object) -> object:
+    """Decode unpadded base64url strictly; py_webauthn's base64url_to_bytes silently
+    drops invalid characters. Bytes pass through, so models can also be built in
+    Python."""
+    if not isinstance(encoded, str):
+        return encoded
+    padded = encoded + "=" * (-len(encoded) % 4)
     try:
         return base64.b64decode(padded, altchars=b"-_", validate=True)
     except binascii.Error as exc:
@@ -119,14 +127,15 @@ class ClientExtensionResults(WebAuthnModel):
 class AttestationResponse(WebAuthnModel):
     client_data_json: Base64URLBytes = Field(alias="clientDataJSON")
     attestation_object: Base64URLBytes
-    # Unknown values are kept here and ignored later, since browsers may add new transports.
+    # Unknown values are kept here and ignored later, since browsers may add new
+    # transports.
     transports: list[str] = []
 
 
 class RegistrationResponse(WebAuthnModel):
     """What `navigator.credentials.create()` returns."""
 
-    id: str
+    id: Base64URLBytes
     raw_id: Base64URLBytes
     type: Literal["public-key"]
     response: AttestationResponse
@@ -144,7 +153,7 @@ class AssertionResponse(WebAuthnModel):
 class AuthenticationResponse(WebAuthnModel):
     """What `navigator.credentials.get()` returns."""
 
-    id: str
+    id: Base64URLBytes
     raw_id: Base64URLBytes
     type: Literal["public-key"]
     response: AssertionResponse

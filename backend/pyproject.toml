@@ -19,8 +19,9 @@ dependencies = [
 [tool.uv]
 package = false
 
-# Not a distributable package, but uv still asks setuptools for the dynamic metadata; with no explicit list
-# its auto-discovery fails on the several top-level packages (app, migrations).
+# Not a distributable package, but uv still asks setuptools for the dynamic metadata;
+# with no explicit list its auto-discovery fails on the several top-level packages
+# (app, migrations).
 [tool.setuptools]
 packages = []
 
@@ -33,18 +34,17 @@ dev = [
 ]
 
 [tool.ruff]
-# Short enough that the formatter splits calls into one argument per line (see docs/code-style.md).
-line-length = 100
+# line-length is left at ruff's default, 88.
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "SIM", "ASYNC", "RUF", "TID"]
 
-# Strict types only: structured data is a Pydantic model or a dataclass, never dict[str, Any]
-# (docs/code-style.md). mypy's disallow_any_explicit backs this up for annotations.
+# Strict types only: structured data is a Pydantic model or a dataclass, never
+# dict[str, Any] (docs/code-style.md). mypy's disallow_any_explicit backs this up.
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
-"typing.Any".msg = "Model the data with a Pydantic model or dataclass instead (docs/code-style.md)."
-"typing_extensions.Any".msg = "Model the data with a Pydantic model or dataclass instead (docs/code-style.md)."
+"typing.Any".msg = "Use a Pydantic model or dataclass (docs/code-style.md)."
+"typing_extensions.Any".msg = "Use a Pydantic model or dataclass (docs/code-style.md)."
 
 [tool.mypy]
 python_version = "3.12"

@@ -1,17 +1,16 @@
-"""A software WebAuthn authenticator, so tests can register and sign in with real passkeys: it
-answers the same options, with the same credentials, as a browser's
+"""A software WebAuthn authenticator, so tests can register and sign in with real
+passkeys: it answers the same options, with the same credentials, as a browser's
 navigator.credentials.create() and .get()."""
 
 import hashlib
 import secrets
 import struct
-from typing import Literal
+from typing import Literal, TypedDict
 
 import cbor2
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from pydantic import BaseModel
-from webauthn.helpers import bytes_to_base64url
 from webauthn.helpers.structs import AuthenticatorAttachment
 
 from app.core.config import get_settings
@@ -20,6 +19,7 @@ from app.schemas.webauthn import (
     AttestationResponse,
     AuthenticationOptions,
     AuthenticationResponse,
+    Base64URLBytes,
     RegistrationOptions,
     RegistrationResponse,
 )
@@ -29,11 +29,22 @@ class ClientData(BaseModel):
     """The clientDataJSON a browser builds for each ceremony."""
 
     type: Literal["webauthn.create", "webauthn.get"]
-    challenge: str
+    challenge: Base64URLBytes
     origin: str
 
 
-# Authenticator data flags: user present, user verified, attested credential data included.
+class AttestationObject(TypedDict):
+    """The CBOR map an authenticator returns from registration. A TypedDict, because
+    cbor2 encodes dicts."""
+
+    fmt: Literal["none"]
+    # The attestation statement; empty for "none" attestation.
+    attStmt: dict[str, bytes]
+    authData: bytes
+
+
+# Authenticator data flags: user present, user verified, attested credential data
+# included.
 USER_PRESENT = 0x01
 USER_VERIFIED = 0x04
 ATTESTED_CREDENTIAL_DATA = 0x40
@@ -55,27 +66,31 @@ class SoftwareAuthenticator:
         """Answer creation options with a new credential, using "none" attestation."""
         self.user_handle = options.user.id
         attestation_object = cbor2.dumps(
-            {
-                "fmt": "none",
-                "attStmt": {},
-                "authData": self._registration_authenticator_data(),
-            }
+            AttestationObject(
+                fmt="none",
+                attStmt={},
+                authData=self._registration_authenticator_data(),
+            )
         )
         return RegistrationResponse(
-            id=bytes_to_base64url(self.credential_id),
+            id=self.credential_id,
             raw_id=self.credential_id,
             type="public-key",
             response=AttestationResponse(
-                client_data_json=self._client_data("webauthn.create", options.challenge),
+                client_data_json=self._client_data(
+                    "webauthn.create", options.challenge
+                ),
                 attestation_object=attestation_object,
                 transports=["internal"],
             ),
             authenticator_attachment=AuthenticatorAttachment.PLATFORM,
         )
 
-    def get(self, options: AuthenticationOptions | RegistrationOptions) -> AuthenticationResponse:
-        """Answer request options with a signed assertion. Registration options are accepted too, so
-        tests can answer the wrong kind of challenge."""
+    def get(
+        self, options: AuthenticationOptions | RegistrationOptions
+    ) -> AuthenticationResponse:
+        """Answer request options with a signed assertion. Registration options are
+        accepted too, so tests can answer the wrong kind of challenge."""
         self.sign_count += 1
         client_data = self._client_data("webauthn.get", options.challenge)
         authenticator_data = (
@@ -88,7 +103,7 @@ class SoftwareAuthenticator:
             ec.ECDSA(hashes.SHA256()),
         )
         return AuthenticationResponse(
-            id=bytes_to_base64url(self.credential_id),
+            id=self.credential_id,
             raw_id=self.credential_id,
             type="public-key",
             response=AssertionResponse(
@@ -105,7 +120,7 @@ class SoftwareAuthenticator:
     ) -> bytes:
         client_data = ClientData(
             type=ceremony,
-            challenge=bytes_to_base64url(challenge),
+            challenge=challenge,
             origin=self.origin,
         )
         return client_data.model_dump_json().encode()
@@ -115,8 +130,8 @@ class SoftwareAuthenticator:
 
     def _registration_authenticator_data(self) -> bytes:
         public_numbers = self.private_key.public_key().public_numbers()
-        # COSE_Key for ES256: kty EC2 (2), alg ES256 (-7), crv P-256 (1), then the x and y
-        # coordinates.
+        # COSE_Key for ES256: kty EC2 (2), alg ES256 (-7), crv P-256 (1), then the x and
+        # y coordinates.
         cose_key = cbor2.dumps(
             {
                 1: 2,

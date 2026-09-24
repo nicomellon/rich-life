@@ -25,7 +25,7 @@ pre-commit install
 
 ## Code style
 
-Code follows [`docs/code-style.md`](docs/code-style.md): strict types (never `dict[str, Any]`), descriptive names, one argument per line when a call is split, and one scenario per test. ruff and mypy enforce the typing rules; the rest are checked in review. Claude Code loads the guide automatically through `CLAUDE.md`, and its `code-style-reviewer` agent checks a diff against it.
+Code follows [`docs/code-style.md`](docs/code-style.md): strict types (never `dict[str, Any]`), descriptive names, and one scenario per test, with layout left to the formatters. ruff and mypy enforce the typing rules; the rest are checked in review. Claude Code loads the guide automatically through `CLAUDE.md`, and its `code-style-reviewer` agent checks a diff against it.
 
 ## Branches
 

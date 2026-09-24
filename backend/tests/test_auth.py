@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 
@@ -31,7 +30,9 @@ def post_model(client: TestClient, path: str, model: BaseModel) -> Response:
     )
 
 
-def request_registration_options(client: TestClient, email: str = EMAIL) -> RegistrationOptions:
+def request_registration_options(
+    client: TestClient, email: str = EMAIL
+) -> RegistrationOptions:
     response = client.post("/api/v1/auth/register-challenge", json={"email": email})
     assert response.status_code == 200, response.text
     return RegistrationOptions.model_validate(response.json())
@@ -43,7 +44,9 @@ def request_authentication_options(client: TestClient) -> AuthenticationOptions:
     return AuthenticationOptions.model_validate(response.json())
 
 
-def verify_registration(client: TestClient, authenticator: SoftwareAuthenticator) -> Response:
+def verify_registration(
+    client: TestClient, authenticator: SoftwareAuthenticator
+) -> Response:
     registration = authenticator.create(request_registration_options(client))
     return post_model(client, "/api/v1/auth/verify-registration", registration)
 
@@ -67,7 +70,9 @@ def verify_login(client: TestClient, authenticator: SoftwareAuthenticator) -> Re
 
 def expire_all_challenges(db: Session) -> None:
     db.execute(
-        update(WebAuthnChallenge).values(expires_at=datetime.now(UTC) - timedelta(seconds=1))
+        update(WebAuthnChallenge).values(
+            expires_at=datetime.now(UTC) - timedelta(seconds=1)
+        )
     )
 
 
@@ -114,19 +119,25 @@ def test_register_challenge_names_the_relying_party(client: TestClient) -> None:
     assert (options.rp.id, options.rp.name) == ("localhost", "Rich Life")
 
 
-def test_register_challenge_names_the_user_by_their_lowercased_email(client: TestClient) -> None:
+def test_register_challenge_names_the_user_by_their_lowercased_email(
+    client: TestClient,
+) -> None:
     options = request_registration_options(client, "Ada@Example.COM")
 
     assert options.user.name == EMAIL
 
 
-def test_register_challenge_hides_the_email_from_the_user_handle(client: TestClient) -> None:
+def test_register_challenge_hides_the_email_from_the_user_handle(
+    client: TestClient,
+) -> None:
     options = request_registration_options(client)
 
     assert EMAIL.encode() not in options.user.id
 
 
-def test_register_challenge_requires_a_discoverable_credential(client: TestClient) -> None:
+def test_register_challenge_requires_a_discoverable_credential(
+    client: TestClient,
+) -> None:
     options = request_registration_options(client)
 
     assert options.authenticator_selection.resident_key == "required"
@@ -138,7 +149,9 @@ def test_register_challenge_requires_user_verification(client: TestClient) -> No
     assert options.authenticator_selection.user_verification == "required"
 
 
-@pytest.mark.parametrize("email", [EMAIL, "ADA@example.com"], ids=["same-case", "other-case"])
+@pytest.mark.parametrize(
+    "email", [EMAIL, "ADA@example.com"], ids=["same-case", "other-case"]
+)
 def test_register_challenge_for_a_registered_email_returns_409(
     client: TestClient,
     registered_authenticator: SoftwareAuthenticator,
@@ -146,7 +159,10 @@ def test_register_challenge_for_a_registered_email_returns_409(
 ) -> None:
     response = client.post("/api/v1/auth/register-challenge", json={"email": email})
 
-    assert (response.status_code, response.json()) == (409, {"detail": "Email already registered"})
+    assert (response.status_code, response.json()) == (
+        409,
+        {"detail": "Email already registered"},
+    )
 
 
 @pytest.mark.parametrize(
@@ -194,7 +210,9 @@ def test_verify_registration_stores_the_passkey(
     registered_user: User,
     registered_authenticator: SoftwareAuthenticator,
 ) -> None:
-    passkey = db.scalars(select(Passkey).where(Passkey.user_id == registered_user.id)).one()
+    passkey = db.scalars(
+        select(Passkey).where(Passkey.user_id == registered_user.id)
+    ).one()
 
     assert passkey.credential_id == registered_authenticator.credential_id
 
@@ -203,7 +221,9 @@ def test_verify_registration_stores_the_passkeys_transports(
     db: Session,
     registered_user: User,
 ) -> None:
-    passkey = db.scalars(select(Passkey).where(Passkey.user_id == registered_user.id)).one()
+    passkey = db.scalars(
+        select(Passkey).where(Passkey.user_id == registered_user.id)
+    ).one()
 
     assert passkey.transports == ["internal"]
 
@@ -215,12 +235,20 @@ def test_verify_registration_deletes_the_challenge(
     assert db.scalars(select(WebAuthnChallenge)).all() == []
 
 
-def test_second_of_two_racing_sign_ups_for_one_email_returns_409(client: TestClient) -> None:
-    first_registration = SoftwareAuthenticator().create(request_registration_options(client))
-    second_registration = SoftwareAuthenticator().create(request_registration_options(client))
+def test_second_of_two_racing_sign_ups_for_one_email_returns_409(
+    client: TestClient,
+) -> None:
+    first_registration = SoftwareAuthenticator().create(
+        request_registration_options(client)
+    )
+    second_registration = SoftwareAuthenticator().create(
+        request_registration_options(client)
+    )
     post_model(client, "/api/v1/auth/verify-registration", first_registration)
 
-    response = post_model(client, "/api/v1/auth/verify-registration", second_registration)
+    response = post_model(
+        client, "/api/v1/auth/verify-registration", second_registration
+    )
 
     assert response.status_code == 409
 
@@ -267,7 +295,9 @@ def test_verify_registration_rejects_a_reused_challenge(
 
 
 def test_verify_registration_rejects_another_origin(client: TestClient) -> None:
-    response = verify_registration(client, SoftwareAuthenticator(origin="https://evil.example.com"))
+    response = verify_registration(
+        client, SoftwareAuthenticator(origin="https://evil.example.com")
+    )
 
     assert_verification_failed(response)
 
@@ -330,7 +360,9 @@ def test_login_challenge_requires_user_verification(client: TestClient) -> None:
     assert options.user_verification == "required"
 
 
-def test_issuing_a_challenge_clears_expired_ones(client: TestClient, db: Session) -> None:
+def test_issuing_a_challenge_clears_expired_ones(
+    client: TestClient, db: Session
+) -> None:
     request_authentication_options(client)
     expire_all_challenges(db)
 
@@ -363,7 +395,9 @@ def test_login_increases_the_passkeys_sign_count(
     verify_login(client, registered_authenticator)
 
     passkey = db.scalars(
-        select(Passkey).where(Passkey.credential_id == registered_authenticator.credential_id)
+        select(Passkey).where(
+            Passkey.credential_id == registered_authenticator.credential_id
+        )
     ).one()
     assert passkey.sign_count == 1
 
@@ -376,7 +410,9 @@ def test_login_sets_passkey_last_used_at(
     verify_login(client, registered_authenticator)
 
     passkey = db.scalars(
-        select(Passkey).where(Passkey.credential_id == registered_authenticator.credential_id)
+        select(Passkey).where(
+            Passkey.credential_id == registered_authenticator.credential_id
+        )
     ).one()
     assert passkey.last_used_at is not None
 
@@ -397,8 +433,12 @@ def test_login_with_a_bad_signature_returns_401(
     client: TestClient,
     registered_authenticator: SoftwareAuthenticator,
 ) -> None:
-    authentication = registered_authenticator.get(request_authentication_options(client))
-    other_assertion = SoftwareAuthenticator().get(request_authentication_options(client))
+    authentication = registered_authenticator.get(
+        request_authentication_options(client)
+    )
+    other_assertion = SoftwareAuthenticator().get(
+        request_authentication_options(client)
+    )
     authentication.response.signature = other_assertion.response.signature
 
     response = post_model(client, "/api/v1/auth/verify-login", authentication)
@@ -423,7 +463,9 @@ def test_login_rejects_a_reused_challenge(
     client: TestClient,
     registered_authenticator: SoftwareAuthenticator,
 ) -> None:
-    authentication = registered_authenticator.get(request_authentication_options(client))
+    authentication = registered_authenticator.get(
+        request_authentication_options(client)
+    )
     post_model(client, "/api/v1/auth/verify-login", authentication)
 
     response = post_model(client, "/api/v1/auth/verify-login", authentication)
@@ -448,7 +490,9 @@ def test_login_rejects_an_expired_challenge(
     db: Session,
     registered_authenticator: SoftwareAuthenticator,
 ) -> None:
-    authentication = registered_authenticator.get(request_authentication_options(client))
+    authentication = registered_authenticator.get(
+        request_authentication_options(client)
+    )
     expire_all_challenges(db)
 
     response = post_model(client, "/api/v1/auth/verify-login", authentication)
@@ -460,7 +504,9 @@ def test_login_rejects_an_expired_challenge(
 
 
 @pytest.fixture
-def signed_in_headers(client: TestClient, authenticator: SoftwareAuthenticator) -> dict[str, str]:
+def signed_in_headers(
+    client: TestClient, authenticator: SoftwareAuthenticator
+) -> dict[str, str]:
     return auth_header(register(client, authenticator).access_token)
 
 
@@ -477,7 +523,8 @@ def test_me_returns_the_current_user(
 
 @dataclass
 class UncheckedClaims:
-    """Access token claims without AccessTokenClaims' validation, to forge invalid tokens."""
+    """Access token claims without AccessTokenClaims' validation, to forge invalid
+    tokens."""
 
     sub: str
     exp: datetime
@@ -500,7 +547,9 @@ AN_HOUR_AGO = datetime.now(UTC) - timedelta(hours=1)
         {"Authorization": "Bearer not-a-jwt"},
         {"Authorization": "Basic YWRhOnB3"},
         auth_header(
-            signed_token(UncheckedClaims(sub="1", exp=IN_AN_HOUR), secret="other-" + "x" * 32)
+            signed_token(
+                UncheckedClaims(sub="1", exp=IN_AN_HOUR), secret="other-" + "x" * 32
+            )
         ),
         auth_header(signed_token(UncheckedClaims(sub="1", exp=AN_HOUR_AGO))),
         auth_header(create_access_token(999_999_999)),
@@ -522,14 +571,19 @@ def test_me_without_a_valid_token_returns_401(
 ) -> None:
     response = client.get("/api/v1/auth/me", headers=headers)
 
-    assert (response.status_code, response.headers["www-authenticate"]) == (401, "Bearer")
+    assert (response.status_code, response.headers["www-authenticate"]) == (
+        401,
+        "Bearer",
+    )
 
 
 def test_patch_me_returns_the_new_currency(
     client: TestClient,
     signed_in_headers: dict[str, str],
 ) -> None:
-    response = client.patch("/api/v1/auth/me", json={"currency": "usd"}, headers=signed_in_headers)
+    response = client.patch(
+        "/api/v1/auth/me", json={"currency": "usd"}, headers=signed_in_headers
+    )
 
     assert UserRead.model_validate(response.json()).currency == "USD"
 
@@ -565,7 +619,9 @@ def test_patch_me_rejects_an_invalid_payload(
     assert response.status_code == 422
 
 
-@pytest.mark.parametrize("payload", [{}, {"currency": "EUR"}], ids=["empty", "same-currency"])
+@pytest.mark.parametrize(
+    "payload", [{}, {"currency": "EUR"}], ids=["empty", "same-currency"]
+)
 def test_patch_me_without_changes_does_not_commit(
     client: TestClient,
     db: Session,
@@ -574,7 +630,10 @@ def test_patch_me_without_changes_does_not_commit(
     payload: dict[str, str],
 ) -> None:
     commits: list[None] = []
-    record_commit: Callable[[], None] = lambda: commits.append(None)  # noqa: E731
+
+    def record_commit() -> None:
+        commits.append(None)
+
     monkeypatch.setattr(db, "commit", record_commit)
 
     client.patch("/api/v1/auth/me", json=payload, headers=signed_in_headers)

@@ -10,8 +10,8 @@ JWT_ALGORITHM = "HS256"
 
 
 class AccessTokenClaims(BaseModel):
-    """The claims of an access token. JWT subjects are strings, so the user id travels as its
-    decimal string."""
+    """The claims of an access token. JWT subjects are strings, so the user id
+    travels as its decimal string."""
 
     sub: Annotated[str, Field(pattern=r"^[0-9]+$")]
     iat: datetime
@@ -38,7 +38,8 @@ def create_access_token(user_id: int) -> str:
 
 
 def decode_access_token(token: str) -> AccessTokenClaims | None:
-    """Return the token's claims, or None if the token is malformed, tampered with or expired."""
+    """Return the token's claims, or None if the token is malformed, tampered with or
+    expired."""
     try:
         return AccessTokenClaims.model_validate(
             jwt.decode(

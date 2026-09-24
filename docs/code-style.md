@@ -18,27 +18,12 @@ Name a variable for what it holds. Words like `pending`, `data`, `result`, `obj`
 
 ## Formatting
 
-- Lines are at most 100 characters, in Python (ruff) and TypeScript (Prettier).
-- When a call, signature or collection doesn't fit on one line, put **one argument per line**, with a trailing comma. Don't pack several keyword arguments onto one continuation line:
+The formatters decide the layout, so don't add formatting rules of your own:
 
-  ```python
-  # No
-  WebAuthnChallenge(
-      challenge=challenge, kind=kind, email=email, user_handle=user_handle, expires_at=expires_at
-  )
+- **Python:** `ruff format`, at ruff's default line length of 88 characters.
+- **TypeScript:** Prettier, at 100 characters (`frontend/.prettierrc.json`).
 
-  # Yes
-  WebAuthnChallenge(
-      challenge=challenge,
-      kind=kind,
-      email=email,
-      user_handle=user_handle,
-      expires_at=expires_at,
-  )
-  ```
-
-  ruff format keeps a call exploded once it has a trailing comma (the "magic trailing comma"). Add one whenever the formatter packs arguments onto a single continuation line.
-- Wrap comments and docstrings at 100 characters too.
+Wrap comments and docstrings at the same widths. ruff's `E501` enforces this for Python.
 
 ## Tests
 
