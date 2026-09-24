@@ -86,7 +86,11 @@ class AuthenticatorSelection(WebAuthnModel):
     resident_key: ResidentKeyRequirement
     require_resident_key: bool
     user_verification: UserVerificationRequirement
-    authenticator_attachment: AuthenticatorAttachment | None = None
+    # Left out when unset: browsers expect the member to be absent, and may reject null
+    # as an invalid enum value.
+    authenticator_attachment: AuthenticatorAttachment | None = Field(
+        default=None, exclude_if=lambda attachment: attachment is None
+    )
 
 
 class RegistrationOptions(WebAuthnModel):

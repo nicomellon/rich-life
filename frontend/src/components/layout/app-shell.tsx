@@ -1,4 +1,7 @@
+import { LogOut } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router'
+import { useAuth, useCurrentUser } from '@/auth/auth-context'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -7,6 +10,9 @@ const navItems = [
 ]
 
 export function AppShell() {
+  const { signOut } = useAuth()
+  const { data: currentUser } = useCurrentUser()
+
   return (
     <div className="flex min-h-svh flex-col">
       <header className="border-b">
@@ -31,6 +37,13 @@ export function AppShell() {
               </NavLink>
             ))}
           </nav>
+          <div className="ml-auto flex items-center gap-3 text-sm">
+            <span className="text-muted-foreground">{currentUser?.email}</span>
+            <Button variant="ghost" size="sm" onClick={signOut}>
+              <LogOut />
+              Sign out
+            </Button>
+          </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">

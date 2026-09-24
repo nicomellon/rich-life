@@ -1,5 +1,5 @@
 import { api, ApiError } from '@/lib/api'
-import { setAccessToken } from '@/lib/auth-token'
+import { getAccessToken, setAccessToken } from '@/lib/auth-token'
 
 function mockFetch(response: Response) {
   return vi.spyOn(globalThis, 'fetch').mockResolvedValue(response)
@@ -70,5 +70,14 @@ describe('api client', () => {
     expect(error).toBeInstanceOf(ApiError)
     expect(error).toMatchObject({ status: 409, detail: 'Email already registered' })
     expect((error as ApiError).message).toBe('Email already registered')
+  })
+
+  it('forgets the access token when the API rejects it', async () => {
+    setAccessToken('expired-token')
+    mockFetch(jsonResponse({ detail: 'Could not validate credentials' }, 401))
+
+    await api.get('/auth/me').catch(() => undefined)
+
+    expect(getAccessToken()).toBeNull()
   })
 })
