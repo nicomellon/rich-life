@@ -101,7 +101,6 @@ def update_month_targets(
     responses={status.HTTP_404_NOT_FOUND: {"description": "Month not found"}},
 )
 def delete_month(requested_month: RequestedMonth, db: DbSession) -> Response:
-    """Everything recorded in the month is deleted with it."""
     db.delete(requested_month)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
