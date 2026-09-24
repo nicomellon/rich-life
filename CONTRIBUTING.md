@@ -23,6 +23,10 @@ pre-commit install
 5. Open a pull request. Its title and description become the single squash commit on `main`, so write them with the same care as a commit message. The description must end with `Closes #6`.
 6. Merge with **Squash and merge** once CI is green. The branch is deleted automatically.
 
+## Code style
+
+Code follows [`docs/code-style.md`](docs/code-style.md): strict types (never `dict[str, Any]`), descriptive names, one argument per line when a call is split, and one scenario per test. ruff and mypy enforce the typing rules; the rest are checked in review. Claude Code loads the guide automatically through `CLAUDE.md`, and its `code-style-reviewer` agent checks a diff against it.
+
 ## Branches
 
 - Name: `<issue-number>-<short-slug>`, for example `6-user-auth` or `21-commit-conventions`.
