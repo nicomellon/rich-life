@@ -20,7 +20,10 @@ def test_docs_are_served() -> None:
 def test_cors_allows_configured_origin() -> None:
     response = client.options(
         "/health",
-        headers={"Origin": "http://localhost:5173", "Access-Control-Request-Method": "GET"},
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "GET",
+        },
     )
 
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"

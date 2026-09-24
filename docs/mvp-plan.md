@@ -5,7 +5,8 @@
 
 Decisions made:
 - Monorepo with `frontend/` (Vite + React + TypeScript + React Router + TanStack Query) and `backend/` (FastAPI + Pydantic v2 + SQLAlchemy 2.0 + Alembic + PostgreSQL).
-- Multiple users with email/password login (JWT). All data belongs to one user.
+- Multiple users who sign in with **passkeys** (WebAuthn), not passwords, so there is no password to leak, reuse or phish and signing in is one biometric or PIN prompt. After a successful passkey ceremony the backend issues a JWT access token. All data belongs to one user.
+- Users who can't use a passkey will get a **magic link** fallback (an emailed, short-lived sign-in link). It comes after the MVP, in Milestone 5; until then a passkey is the only way in.
 - One currency, set per user. Amounts are stored as `NUMERIC(12,2)` and handled as `Decimal`, never float.
 
 The plan below is split into GitHub issues, grouped by milestone. Each issue lists its dependencies and acceptance criteria (AC). Issue numbers match the GitHub issues in this repository.
@@ -16,7 +17,9 @@ The plan below is split into GitHub issues, grouped by milestone. Each issue lis
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `users` | id, email (unique), password_hash, currency (ISO 4217, default `EUR`), created_at | |
+| `users` | id, email (unique), webauthn_user_handle (random bytes, unique), currency (ISO 4217, default `EUR`), created_at | No password. The email identifies the account and will receive magic links (Milestone 5). The WebAuthn user handle is sent to authenticators instead of the email or id. |
+| `passkeys` | id, user_id, credential_id (bytes, unique), public_key (bytes), sign_count, transports, created_at, last_used_at | One row per registered passkey; a user can have several. |
+| `webauthn_challenges` | id, challenge (bytes, unique), kind (`registration` / `authentication`), email and user handle (registration only), expires_at | Issued by the `*-challenge` endpoints and deleted when used, so each challenge works once. Expires after 5 minutes. |
 | `buckets` | id, user_id, kind (enum: `fixed_costs`, `investments`, `savings`, `guilt_free`), name, target_pct `NUMERIC(5,2)`, sort_order | This is the user's **default plan**. The 4 buckets are created at signup with 50/10/20/20. Percentages must add up to 100. |
 | `months` | id, user_id, year, month, income `NUMERIC(12,2)`, created_at; unique(user_id, year, month) | One row per budgeted month. |
 | `month_targets` | id, month_id, bucket_id, target_pct | **Copies** the bucket percentages when the month is created, so changing the default plan later does not rewrite past months. The user can edit these per month. |
@@ -25,7 +28,8 @@ The plan below is split into GitHub issues, grouped by milestone. Each issue lis
 Derived per month (computed on the fly, not stored): for each bucket, `target_amount = income × target_pct / 100`, `actual = sum(entries)`, `remaining = target − actual`, `actual_pct = actual / income`. Totals: planned, actual, unallocated.
 
 ## API surface (`/api/v1`)
-- Auth: `POST /auth/register`, `POST /auth/login` (returns a JWT access token), `GET /auth/me`, `PATCH /auth/me` (currency)
+- Auth: `POST /auth/register-challenge` ({email}; returns WebAuthn creation options), `POST /auth/verify-registration` (the browser's credential; creates the user and passkey, returns a JWT access token), `POST /auth/login-challenge` (returns WebAuthn request options), `POST /auth/verify-login` (the browser's assertion; returns a JWT access token), `GET /auth/me`, `PATCH /auth/me` (currency)
+- Auth, after the MVP (Milestone 5): `POST /auth/magic-link` ({email}; emails a sign-in link), `POST /auth/magic-link/verify` ({token}; returns a JWT access token)
 - Plan: `GET /buckets`, `PUT /buckets` (update all percentages at once; validates sum = 100)
 - Months: `GET /months`, `POST /months` ({year, month, income}; copies targets), `GET /months/{y}/{m}`, `PATCH /months/{y}/{m}` (income), `PUT /months/{y}/{m}/targets`, `DELETE /months/{y}/{m}`
 - Entries: `GET /months/{y}/{m}/entries?bucket_id=`, `POST /months/{y}/{m}/entries`, `PATCH /entries/{id}`, `DELETE /entries/{id}`
@@ -62,13 +66,19 @@ Derived per month (computed on the fly, not stored): for each bucket, `target_am
 
 ## Milestone 1 — Authentication
 
-**#6 User model and auth endpoints** — depends on #3
-- `users` model and migration, password hashing (argon2 via `pwdlib` or bcrypt), JWT issue/verify (`pyjwt`), and a `get_current_user` dependency. Register, login, `me`, and a PATCH to change currency.
-- AC: register/login/me work, duplicate emails return 409, bad credentials return 401, and pytest covers all of these.
+**#6 User model and passkey auth endpoints** — depends on #3
+- `users`, `passkeys` and `webauthn_challenges` models and migrations. WebAuthn ceremonies with [`webauthn`](https://github.com/duo-labs/py_webauthn) (py_webauthn), JWT issue/verify (`pyjwt`), and a `get_current_user` dependency. New settings: `WEBAUTHN_RP_ID`, `WEBAUTHN_RP_NAME` and `WEBAUTHN_ORIGIN` (the web app's origin, e.g. `http://localhost:5173`).
+- The flow: the React app asks for a challenge, passes the options to the browser (`navigator.credentials.create()` / `.get()`), and sends the resulting credential back for verification.
+  - `POST /auth/register-challenge` takes an email and returns creation options that require a discoverable credential (resident key) and user verification. `POST /auth/verify-registration` verifies the attestation, creates the user and their passkey, and returns an access token.
+  - `POST /auth/login-challenge` returns request options with no `allowCredentials`, so the browser offers every passkey it has for the site and the user doesn't type an email. `POST /auth/verify-login` finds the passkey by credential id, verifies the signature, updates `sign_count` and `last_used_at`, and returns an access token.
+  - Challenges are stored server-side, single use, and expire after 5 minutes.
+- `GET /auth/me`, and `PATCH /auth/me` to change the currency.
+- AC: registration and login work end to end; a duplicate email returns 409; an unknown, expired or reused challenge, an unknown credential, or a bad signature returns 401; `me` requires a valid token. pytest covers all of these, using a software authenticator in the tests to produce real attestations and assertions.
 
-**#7 Frontend auth flow** — depends on #4, #6
-- Login and register pages, token storage (localStorage is fine for the MVP), an `AuthContext`, protected routes, logout, and a redirect to login on 401.
-- AC: a user can register, log in, reload and stay logged in, and log out.
+**#7 Frontend passkey auth flow** — depends on #4, #6
+- Register and sign-in pages using [`@simplewebauthn/browser`](https://simplewebauthn.dev/) to run the ceremonies: register asks for an email and then creates a passkey; sign in is a single "Sign in with a passkey" button (optionally with passkey autofill on the email field). Show a clear message when the browser doesn't support passkeys or the user cancels the prompt.
+- Token storage (localStorage is fine for the MVP), an `AuthContext`, protected routes, logout, and a redirect to sign in on 401.
+- AC: a user can register with a passkey, sign in with it, reload and stay signed in, and log out.
 
 ## Milestone 2 — Spending plan (buckets and target percentages)
 
@@ -115,26 +125,42 @@ Derived per month (computed on the fly, not stored): for each bucket, `target_am
 **#17 Error handling and UX polish**
 - One consistent API error format, toast notifications, loading skeletons, empty states, form validation with zod + react-hook-form, and a responsive layout.
 
-**#18 Seed data and demo user**
-- `python -m app.scripts.seed` creates a demo user with 3 months of example data.
+**#18 Seed data for a user**
+- `python -m app.scripts.seed --email you@example.com` adds 3 months of example data to an existing account. With passkeys there is no demo password to share, so register an account in the app first and seed it.
 
 **#19 End-to-end tests (Playwright)** — depends on #15
 - Happy path: register → set the plan → create a month → add entries → check the dashboard numbers.
+- Passkeys run against Chromium's virtual authenticator (the `WebAuthn.addVirtualAuthenticator` DevTools Protocol command), so no real device or biometric prompt is needed.
 
 **#20 Containerisation and deployment**
 - Dockerfiles for the backend (running Alembic migrations on start) and the frontend (static build served by nginx or Caddy, which also proxies `/api` to the backend so the app stays same-origin), a production compose file, and deploy docs (e.g. Fly.io, Render, or a VPS).
+- Passkeys need HTTPS in production, and `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` must match the production domain. Passkeys are bound to the RP ID, so changing the domain later invalidates every registered passkey.
+
+## Milestone 5 — Magic-link fallback (after the MVP)
+
+Until this milestone ships, a user who loses every device holding their passkey can't get back into their account. Passkeys synced by iCloud Keychain, Google Password Manager or a password manager make this rare, but it's the main gap this milestone closes.
+
+**#29 Magic-link sign-in API** — depends on #6
+- Add Redis to `docker-compose.yml` and CI, with a `REDIS_URL` setting. `POST /auth/magic-link` takes an email and, if an account exists, generates a random single-use token, stores only its hash in Redis with a 15-minute TTL, and emails a link to the web app containing the token. It always returns 202, so it doesn't reveal which emails have accounts. `POST /auth/magic-link/verify` takes the token, deletes it from Redis and returns an access token.
+- Send email through a provider API such as Resend or SendGrid (`EMAIL_API_KEY`, `EMAIL_FROM`); in development, log the link instead of sending it. Rate-limit requests per email and per IP.
+- A signed-in user can add another passkey: `register-challenge` and `verify-registration` called with a bearer token add a passkey to the current account instead of creating one.
+- AC: a valid link signs the user in exactly once; expired, reused or unknown tokens return 401; unknown emails get the same 202 as known ones; the rate limit is enforced; and all of this is tested with a fake email sender.
+
+**#30 Magic-link sign-in UI** — depends on #7, #29
+- An "Email me a sign-in link" option on the sign-in page, a confirmation screen, and a landing route for the link that verifies the token and signs the user in. After signing in by link, offer to create a passkey on this device.
+- AC: a user without a passkey on this device can request a link, follow it to get signed in, and add a passkey.
 
 ### Out of scope for the MVP (possible future issues)
-Recurring expenses, sub-categories within buckets, several income line items, bank import or CSV, multiple currencies, trends across months, refresh tokens, and password reset.
+Recurring expenses, sub-categories within buckets, several income line items, bank import or CSV, multiple currencies, trends across months, refresh tokens, and a page to rename or remove passkeys.
 
 ---
 
 ## Suggested order and parallel work
-#21 → #1 → (#2 → #3 → #6 → #8 → #10 → #11 → #12) running alongside (#4 → #7). After that: #9, #13, #14, #15, #16, then Milestone 4. #5 (CI) should be done early, right after #2 and #4.
+#21 → #1 → (#2 → #3 → #6 → #8 → #10 → #11 → #12) running alongside (#4 → #7). After that: #9, #13, #14, #15, #16, then Milestone 4. #5 (CI) should be done early, right after #2 and #4. Milestone 5 (#29 → #30) follows the MVP release.
 
 ## Verification (end-to-end, once implemented)
 1. `docker compose up db`, then `cd backend && alembic upgrade head && uvicorn app.main:app --reload`
 2. `cd frontend && npm run dev`, then open http://localhost:5173
-3. Register, set the plan to 50/10/20/20, create the current month with income 3000, and add entries: rent 1200 (Fixed), ETF 300 (Investments), 600 (Savings), 400 (Guilt-Free).
+3. Register with a passkey, set the plan to 50/10/20/20, create the current month with income 3000, and add entries: rent 1200 (Fixed), ETF 300 (Investments), 600 (Savings), 400 (Guilt-Free).
 4. The dashboard should show targets of 1500/300/600/600, actuals of 1200/300/600/400, and 500 unallocated.
 5. `pytest` (backend), `npm test` (frontend), and `npx playwright test` (e2e) all pass in CI.

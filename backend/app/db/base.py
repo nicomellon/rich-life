@@ -1,10 +1,12 @@
 from datetime import datetime
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from sqlalchemy import DateTime, MetaData
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.types import TypeEngine
 
-# Deterministic constraint names, so Alembic can autogenerate migrations that alter or drop them.
+# Deterministic constraint names, so Alembic can autogenerate migrations that alter or
+# drop them.
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_N_name)s",
@@ -15,8 +17,11 @@ NAMING_CONVENTION = {
 
 
 class Base(DeclarativeBase):
-    """Declarative base for all models. Alembic autogenerates migrations from `Base.metadata`."""
+    """Declarative base for all models. Alembic autogenerates migrations from
+    `Base.metadata`."""
 
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
     # Store every `Mapped[datetime]` as a timezone-aware timestamp.
-    type_annotation_map: ClassVar[dict[Any, Any]] = {datetime: DateTime(timezone=True)}
+    type_annotation_map: ClassVar[dict[type, TypeEngine[datetime]]] = {
+        datetime: DateTime(timezone=True)
+    }

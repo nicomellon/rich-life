@@ -23,7 +23,8 @@ def test_get_db_yields_a_session_and_closes_it() -> None:
 
 
 def test_alembic_is_configured_from_the_app() -> None:
-    # Offline mode renders the migration SQL without a database, which exercises migrations/env.py end to end.
+    # Offline mode renders the migration SQL without a database, which exercises
+    # migrations/env.py end to end.
     output = io.StringIO()
     config = Config(toml_file=str(BACKEND_DIR / "pyproject.toml"), stdout=output)
     config.output_buffer = output

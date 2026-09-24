@@ -9,18 +9,21 @@ from app.db.base import Base
 
 config = context.config
 
-# Logging comes from alembic.ini; it's absent when Alembic is driven from code, e.g. in tests.
+# Logging comes from alembic.ini; it's absent when Alembic is driven from code, e.g. in
+# tests.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
 
-# Same source as the app: the DATABASE_URL environment variable, never a value in a config file.
+# Same source as the app: the DATABASE_URL environment variable, never a value in a
+# config file.
 database_url = get_settings().database_url
 
 
 def run_migrations_offline() -> None:
-    """Write the migration SQL to stdout (`alembic upgrade head --sql`) without connecting to the database."""
+    """Write the migration SQL to stdout (`alembic upgrade head --sql`) without
+    connecting to the database."""
     context.configure(
         url=database_url,
         target_metadata=target_metadata,
