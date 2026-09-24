@@ -1,5 +1,6 @@
 import type { AccessToken, User } from '@/auth/auth-api'
 import { setAccessToken } from '@/lib/auth-token'
+import type { SpendingPlanPercentages } from '@/spending-plan/spending-plan-api'
 
 /** Builds the response to one request; a fresh one each time, since a body can be read once. */
 type ApiResponder = () => Response
@@ -39,6 +40,14 @@ export const signedInUser: User = {
   email: 'ada@example.com',
   currency: 'EUR',
   created_at: '2026-09-01T10:00:00Z',
+}
+
+/** The default plan every new user starts with. */
+export const defaultSpendingPlan: SpendingPlanPercentages = {
+  fixed_costs_pct: '50.00',
+  investments_pct: '10.00',
+  savings_pct: '20.00',
+  guilt_free_pct: '20.00',
 }
 
 export const issuedAccessToken: AccessToken = { access_token: 'new-token', token_type: 'bearer' }

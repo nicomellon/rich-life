@@ -1,13 +1,22 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { getAccessToken } from '@/lib/auth-token'
-import { jsonResponse, mockApi, signedInUser, signInBeforeRender } from '@/test/api-mock'
+import {
+  defaultSpendingPlan,
+  jsonResponse,
+  mockApi,
+  signedInUser,
+  signInBeforeRender,
+} from '@/test/api-mock'
 import { renderApp } from '@/test/render-app'
 
 describe('AppShell', () => {
   beforeEach(() => {
     signInBeforeRender()
-    mockApi({ 'GET /auth/me': () => jsonResponse(signedInUser) })
+    mockApi({
+      'GET /auth/me': () => jsonResponse(signedInUser),
+      'GET /spending-plan': () => jsonResponse(defaultSpendingPlan),
+    })
   })
 
   it('shows the main navigation', async () => {
