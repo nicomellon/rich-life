@@ -20,7 +20,8 @@ database_url = get_settings().database_url
 
 
 def run_migrations_offline() -> None:
-    """Write the migration SQL to stdout (`alembic upgrade head --sql`) without connecting to the database."""
+    """Write the migration SQL to stdout (`alembic upgrade head --sql`) without connecting to the
+    database."""
     context.configure(
         url=database_url,
         target_metadata=target_metadata,

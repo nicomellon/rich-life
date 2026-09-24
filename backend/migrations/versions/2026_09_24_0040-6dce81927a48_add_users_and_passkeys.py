@@ -26,7 +26,12 @@ def upgrade() -> None:
         sa.Column("email", sa.String(length=320), nullable=False),
         sa.Column("webauthn_user_handle", sa.LargeBinary(length=64), nullable=False),
         sa.Column("currency", sa.String(length=3), server_default="EUR", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_users")),
         sa.UniqueConstraint("email", name=op.f("uq_users_email")),
         sa.UniqueConstraint("webauthn_user_handle", name=op.f("uq_users_webauthn_user_handle")),
@@ -37,7 +42,9 @@ def upgrade() -> None:
         sa.Column("challenge", sa.LargeBinary(length=64), nullable=False),
         sa.Column(
             "kind",
-            sa.Enum("registration", "authentication", name="challengekind", native_enum=False, length=16),
+            sa.Enum(
+                "registration", "authentication", name="challengekind", native_enum=False, length=16
+            ),
             nullable=False,
         ),
         sa.Column("email", sa.String(length=320), nullable=True),
@@ -54,9 +61,16 @@ def upgrade() -> None:
         sa.Column("public_key", sa.LargeBinary(), nullable=False),
         sa.Column("sign_count", sa.BigInteger(), nullable=False),
         sa.Column("transports", postgresql.ARRAY(sa.String(length=32)), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("last_used_at", sa.DateTime(timezone=True), nullable=True),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_passkeys_user_id_users"), ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["user_id"], ["users.id"], name=op.f("fk_passkeys_user_id_users"), ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_passkeys")),
         sa.UniqueConstraint("credential_id", name=op.f("uq_passkeys_credential_id")),
     )

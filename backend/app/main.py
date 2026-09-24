@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import api_router
 from app.core.config import get_settings
+from app.schemas.health import Health
 
 
 def create_app() -> FastAPI:
@@ -18,8 +19,8 @@ def create_app() -> FastAPI:
     )
 
     @app.get("/health", tags=["health"])
-    def health() -> dict[str, str]:
-        return {"status": "ok", "version": settings.app_version}
+    def health() -> Health:
+        return Health(version=settings.app_version)
 
     app.include_router(api_router)
     return app

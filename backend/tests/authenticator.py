@@ -1,21 +1,42 @@
-"""A software WebAuthn authenticator, so tests can register and sign in with real passkeys: it produces the same
-JSON a browser returns from navigator.credentials.create() and .get() (as serialized by @simplewebauthn/browser)."""
+"""A software WebAuthn authenticator, so tests can register and sign in with real passkeys: it
+answers the same options, with the same credentials, as a browser's
+navigator.credentials.create() and .get()."""
 
 import hashlib
-import json
 import secrets
 import struct
-from typing import Any
+from typing import Literal
 
 import cbor2
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
-from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
+from pydantic import BaseModel
+from webauthn.helpers import bytes_to_base64url
+from webauthn.helpers.structs import AuthenticatorAttachment
 
 from app.core.config import get_settings
+from app.schemas.webauthn import (
+    AssertionResponse,
+    AttestationResponse,
+    AuthenticationOptions,
+    AuthenticationResponse,
+    RegistrationOptions,
+    RegistrationResponse,
+)
+
+
+class ClientData(BaseModel):
+    """The clientDataJSON a browser builds for each ceremony."""
+
+    type: Literal["webauthn.create", "webauthn.get"]
+    challenge: str
+    origin: str
+
 
 # Authenticator data flags: user present, user verified, attested credential data included.
-UP, UV, AT = 0x01, 0x04, 0x40
+USER_PRESENT = 0x01
+USER_VERIFIED = 0x04
+ATTESTED_CREDENTIAL_DATA = 0x40
 
 
 class SoftwareAuthenticator:
@@ -30,57 +51,80 @@ class SoftwareAuthenticator:
         self.user_handle: bytes | None = None
         self.sign_count = 0
 
-    def create(self, options: dict[str, Any]) -> dict[str, Any]:
-        """Answer creation options with a new credential (RegistrationResponseJSON), using "none" attestation."""
-        self.user_handle = base64url_to_bytes(options["user"]["id"])
-        client_data = self._client_data("webauthn.create", options["challenge"])
-        attestation_object = cbor2.dumps({"fmt": "none", "attStmt": {}, "authData": self._registration_auth_data()})
-        credential_id = bytes_to_base64url(self.credential_id)
-        return {
-            "id": credential_id,
-            "rawId": credential_id,
-            "type": "public-key",
-            "response": {
-                "clientDataJSON": bytes_to_base64url(client_data),
-                "attestationObject": bytes_to_base64url(attestation_object),
-                "transports": ["internal"],
-            },
-            "authenticatorAttachment": "platform",
-            "clientExtensionResults": {},
-        }
+    def create(self, options: RegistrationOptions) -> RegistrationResponse:
+        """Answer creation options with a new credential, using "none" attestation."""
+        self.user_handle = options.user.id
+        attestation_object = cbor2.dumps(
+            {
+                "fmt": "none",
+                "attStmt": {},
+                "authData": self._registration_authenticator_data(),
+            }
+        )
+        return RegistrationResponse(
+            id=bytes_to_base64url(self.credential_id),
+            raw_id=self.credential_id,
+            type="public-key",
+            response=AttestationResponse(
+                client_data_json=self._client_data("webauthn.create", options.challenge),
+                attestation_object=attestation_object,
+                transports=["internal"],
+            ),
+            authenticator_attachment=AuthenticatorAttachment.PLATFORM,
+        )
 
-    def get(self, options: dict[str, Any]) -> dict[str, Any]:
-        """Answer request options with a signed assertion (AuthenticationResponseJSON)."""
+    def get(self, options: AuthenticationOptions | RegistrationOptions) -> AuthenticationResponse:
+        """Answer request options with a signed assertion. Registration options are accepted too, so
+        tests can answer the wrong kind of challenge."""
         self.sign_count += 1
-        client_data = self._client_data("webauthn.get", options["challenge"])
-        auth_data = self._rp_id_hash() + bytes([UP | UV]) + struct.pack(">I", self.sign_count)
-        signature = self.private_key.sign(auth_data + hashlib.sha256(client_data).digest(), ec.ECDSA(hashes.SHA256()))
-        credential_id = bytes_to_base64url(self.credential_id)
-        return {
-            "id": credential_id,
-            "rawId": credential_id,
-            "type": "public-key",
-            "response": {
-                "clientDataJSON": bytes_to_base64url(client_data),
-                "authenticatorData": bytes_to_base64url(auth_data),
-                "signature": bytes_to_base64url(signature),
-                "userHandle": bytes_to_base64url(self.user_handle) if self.user_handle else None,
-            },
-            "authenticatorAttachment": "platform",
-            "clientExtensionResults": {},
-        }
+        client_data = self._client_data("webauthn.get", options.challenge)
+        authenticator_data = (
+            self._rp_id_hash()
+            + bytes([USER_PRESENT | USER_VERIFIED])
+            + struct.pack(">I", self.sign_count)
+        )
+        signature = self.private_key.sign(
+            authenticator_data + hashlib.sha256(client_data).digest(),
+            ec.ECDSA(hashes.SHA256()),
+        )
+        return AuthenticationResponse(
+            id=bytes_to_base64url(self.credential_id),
+            raw_id=self.credential_id,
+            type="public-key",
+            response=AssertionResponse(
+                client_data_json=client_data,
+                authenticator_data=authenticator_data,
+                signature=signature,
+                user_handle=self.user_handle,
+            ),
+            authenticator_attachment=AuthenticatorAttachment.PLATFORM,
+        )
 
-    def _client_data(self, ceremony: str, challenge: str) -> bytes:
-        return json.dumps({"type": ceremony, "challenge": challenge, "origin": self.origin}).encode()
+    def _client_data(
+        self, ceremony: Literal["webauthn.create", "webauthn.get"], challenge: bytes
+    ) -> bytes:
+        client_data = ClientData(
+            type=ceremony,
+            challenge=bytes_to_base64url(challenge),
+            origin=self.origin,
+        )
+        return client_data.model_dump_json().encode()
 
     def _rp_id_hash(self) -> bytes:
         return hashlib.sha256(self.rp_id.encode()).digest()
 
-    def _registration_auth_data(self) -> bytes:
-        numbers = self.private_key.public_key().public_numbers()
-        # COSE_Key for ES256: kty EC2 (2), alg ES256 (-7), crv P-256 (1), then the x and y coordinates.
+    def _registration_authenticator_data(self) -> bytes:
+        public_numbers = self.private_key.public_key().public_numbers()
+        # COSE_Key for ES256: kty EC2 (2), alg ES256 (-7), crv P-256 (1), then the x and y
+        # coordinates.
         cose_key = cbor2.dumps(
-            {1: 2, 3: -7, -1: 1, -2: numbers.x.to_bytes(32, "big"), -3: numbers.y.to_bytes(32, "big")}
+            {
+                1: 2,
+                3: -7,
+                -1: 1,
+                -2: public_numbers.x.to_bytes(32, "big"),
+                -3: public_numbers.y.to_bytes(32, "big"),
+            }
         )
         attested_credential_data = (
             bytes(16)  # AAGUID: all zeros, an unidentified authenticator
@@ -88,4 +132,9 @@ class SoftwareAuthenticator:
             + self.credential_id
             + cose_key
         )
-        return self._rp_id_hash() + bytes([UP | UV | AT]) + struct.pack(">I", 0) + attested_credential_data
+        return (
+            self._rp_id_hash()
+            + bytes([USER_PRESENT | USER_VERIFIED | ATTESTED_CREDENTIAL_DATA])
+            + struct.pack(">I", 0)
+            + attested_credential_data
+        )

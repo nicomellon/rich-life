@@ -33,15 +33,24 @@ dev = [
 ]
 
 [tool.ruff]
-line-length = 120
+# Short enough that the formatter splits calls into one argument per line (see docs/code-style.md).
+line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I", "B", "UP", "SIM", "ASYNC", "RUF"]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "ASYNC", "RUF", "TID"]
+
+# Strict types only: structured data is a Pydantic model or a dataclass, never dict[str, Any]
+# (docs/code-style.md). mypy's disallow_any_explicit backs this up for annotations.
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Any".msg = "Model the data with a Pydantic model or dataclass instead (docs/code-style.md)."
+"typing_extensions.Any".msg = "Model the data with a Pydantic model or dataclass instead (docs/code-style.md)."
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
+# No explicit Any in annotations, e.g. dict[str, Any] (docs/code-style.md).
+disallow_any_explicit = true
 plugins = ["pydantic.mypy"]
 files = ["app", "migrations", "tests"]
 

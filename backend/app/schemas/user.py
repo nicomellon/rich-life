@@ -11,7 +11,8 @@ def _lowercase(value: str) -> str:
 
 # Emails are compared case-insensitively: always store and look them up lowercased.
 Email = Annotated[EmailStr, AfterValidator(_lowercase)]
-# ISO 4217 alphabetic code, e.g. EUR or USD, checked against pycountry's list. Lowercase input is uppercased.
+# ISO 4217 alphabetic code, e.g. EUR or USD, checked against pycountry's list. Lowercase input is
+# uppercased.
 CurrencyCode = ISO4217
 
 
@@ -25,6 +26,6 @@ class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    email: str
-    currency: str
+    email: Email
+    currency: CurrencyCode
     created_at: datetime

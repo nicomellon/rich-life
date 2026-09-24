@@ -3,8 +3,14 @@ from fastapi import APIRouter, HTTPException, status
 from app.api.deps import CurrentUser, DbSession
 from app.core.security import create_access_token
 from app.models.user import User
-from app.schemas.auth import RegistrationChallengeRequest, Token, WebAuthnJSON
+from app.schemas.auth import RegistrationChallengeRequest, Token
 from app.schemas.user import UserRead, UserUpdate
+from app.schemas.webauthn import (
+    AuthenticationOptions,
+    AuthenticationResponse,
+    RegistrationOptions,
+    RegistrationResponse,
+)
 from app.services import passkeys
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -18,7 +24,7 @@ VERIFICATION_FAILED = HTTPException(
 
 
 def _token_for(user: User) -> Token:
-    return Token(access_token=create_access_token(str(user.id)))
+    return Token(access_token=create_access_token(user.id))
 
 
 @router.post(
@@ -26,8 +32,8 @@ def _token_for(user: User) -> Token:
     summary="Start registering a passkey for a new account",
     responses={status.HTTP_409_CONFLICT: {"description": "Email already registered"}},
 )
-def register_challenge(payload: RegistrationChallengeRequest, db: DbSession) -> WebAuthnJSON:
-    """Returns the options to pass to `navigator.credentials.create()` (PublicKeyCredentialCreationOptionsJSON)."""
+def register_challenge(payload: RegistrationChallengeRequest, db: DbSession) -> RegistrationOptions:
+    """Returns the options to pass to `navigator.credentials.create()`."""
     try:
         return passkeys.start_registration(db, email=payload.email)
     except passkeys.EmailAlreadyRegisteredError:
@@ -43,11 +49,10 @@ def register_challenge(payload: RegistrationChallengeRequest, db: DbSession) -> 
         status.HTTP_409_CONFLICT: {"description": "Email already registered"},
     },
 )
-def verify_registration(credential: WebAuthnJSON, db: DbSession) -> Token:
-    """Takes the credential `navigator.credentials.create()` returned (RegistrationResponseJSON) and signs the new
-    user in."""
+def verify_registration(registration: RegistrationResponse, db: DbSession) -> Token:
+    """Takes the credential `navigator.credentials.create()` returned and signs the new user in."""
     try:
-        user = passkeys.finish_registration(db, credential)
+        user = passkeys.finish_registration(db, registration)
     except passkeys.PasskeyVerificationError:
         raise VERIFICATION_FAILED from None
     except passkeys.EmailAlreadyRegisteredError:
@@ -56,8 +61,8 @@ def verify_registration(credential: WebAuthnJSON, db: DbSession) -> Token:
 
 
 @router.post("/login-challenge", summary="Start signing in with a passkey")
-def login_challenge(db: DbSession) -> WebAuthnJSON:
-    """Returns the options to pass to `navigator.credentials.get()` (PublicKeyCredentialRequestOptionsJSON)."""
+def login_challenge(db: DbSession) -> AuthenticationOptions:
+    """Returns the options to pass to `navigator.credentials.get()`."""
     return passkeys.start_authentication(db)
 
 
@@ -66,10 +71,10 @@ def login_challenge(db: DbSession) -> WebAuthnJSON:
     summary="Sign in with a passkey",
     responses={status.HTTP_401_UNAUTHORIZED: {"description": "Passkey verification failed"}},
 )
-def verify_login(credential: WebAuthnJSON, db: DbSession) -> Token:
-    """Takes the assertion `navigator.credentials.get()` returned (AuthenticationResponseJSON)."""
+def verify_login(authentication: AuthenticationResponse, db: DbSession) -> Token:
+    """Takes the assertion `navigator.credentials.get()` returned."""
     try:
-        user = passkeys.finish_authentication(db, credential)
+        user = passkeys.finish_authentication(db, authentication)
     except passkeys.PasskeyVerificationError:
         raise VERIFICATION_FAILED from None
     return _token_for(user)
