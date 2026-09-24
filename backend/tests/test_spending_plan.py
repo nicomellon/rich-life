@@ -3,7 +3,7 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -111,6 +111,31 @@ def test_put_spending_plan_leaves_other_users_plans_unchanged(
     put_plan(client, signed_in_headers, NEW_PLAN)
 
     assert read_plan(client, other_user_headers) == DEFAULT_PLAN
+
+
+@pytest.fixture
+def headers_of_a_user_without_a_plan(
+    db: Session, signed_in_headers: dict[str, str]
+) -> dict[str, str]:
+    """A signed-in user whose plan row is missing, e.g. deleted by hand."""
+    db.execute(delete(SpendingPlan))
+    return signed_in_headers
+
+
+def test_get_spending_plan_without_a_saved_plan_returns_the_default_plan(
+    client: TestClient, headers_of_a_user_without_a_plan: dict[str, str]
+) -> None:
+    plan = read_plan(client, headers_of_a_user_without_a_plan)
+
+    assert plan == DEFAULT_PLAN
+
+
+def test_put_spending_plan_without_a_saved_plan_saves_the_new_plan(
+    client: TestClient, headers_of_a_user_without_a_plan: dict[str, str]
+) -> None:
+    put_plan(client, headers_of_a_user_without_a_plan, NEW_PLAN)
+
+    assert read_plan(client, headers_of_a_user_without_a_plan) == NEW_PLAN
 
 
 # Rejected plans
