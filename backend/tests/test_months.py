@@ -334,8 +334,13 @@ def test_get_another_users_month_returns_404(
 
 @pytest.mark.parametrize(
     "invalid_path",
-    ["/api/v1/months/2026/0", "/api/v1/months/2026/13", "/api/v1/months/0/9"],
-    ids=["month-0", "month-13", "year-0"],
+    [
+        "/api/v1/months/2026/0",
+        "/api/v1/months/2026/13",
+        "/api/v1/months/0/9",
+        "/api/v1/months/10000/9",
+    ],
+    ids=["month-0", "month-13", "year-0", "year-10000"],
 )
 def test_get_month_with_an_invalid_path_returns_422(
     client: TestClient, signed_in_headers: dict[str, str], invalid_path: str
