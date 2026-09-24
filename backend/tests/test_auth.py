@@ -5,7 +5,6 @@ import jwt
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
-from pydantic import BaseModel
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
@@ -15,27 +14,16 @@ from app.models.passkey import Passkey, WebAuthnChallenge
 from app.models.user import User
 from app.schemas.auth import Token
 from app.schemas.user import UserRead
-from app.schemas.webauthn import AuthenticationOptions, RegistrationOptions
+from app.schemas.webauthn import AuthenticationOptions
+from tests.accounts import (
+    EMAIL,
+    OTHER_EMAIL,
+    auth_header,
+    post_model,
+    register,
+    request_registration_options,
+)
 from tests.authenticator import SoftwareAuthenticator
-
-EMAIL = "ada@example.com"
-OTHER_EMAIL = "grace@example.com"
-
-
-def post_model(client: TestClient, path: str, model: BaseModel) -> Response:
-    return client.post(
-        path,
-        content=model.model_dump_json(),
-        headers={"Content-Type": "application/json"},
-    )
-
-
-def request_registration_options(
-    client: TestClient, email: str = EMAIL
-) -> RegistrationOptions:
-    response = client.post("/api/v1/auth/register-challenge", json={"email": email})
-    assert response.status_code == 200, response.text
-    return RegistrationOptions.model_validate(response.json())
 
 
 def request_authentication_options(client: TestClient) -> AuthenticationOptions:
@@ -51,18 +39,6 @@ def verify_registration(
     return post_model(client, "/api/v1/auth/verify-registration", registration)
 
 
-def register(
-    client: TestClient,
-    authenticator: SoftwareAuthenticator,
-    email: str = EMAIL,
-) -> Token:
-    """Create an account whose passkey lives on `authenticator`."""
-    registration = authenticator.create(request_registration_options(client, email))
-    response = post_model(client, "/api/v1/auth/verify-registration", registration)
-    assert response.status_code == 201, response.text
-    return Token.model_validate(response.json())
-
-
 def verify_login(client: TestClient, authenticator: SoftwareAuthenticator) -> Response:
     authentication = authenticator.get(request_authentication_options(client))
     return post_model(client, "/api/v1/auth/verify-login", authentication)
@@ -76,20 +52,11 @@ def expire_all_challenges(db: Session) -> None:
     )
 
 
-def auth_header(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
-
-
 def assert_verification_failed(response: Response) -> None:
     assert (response.status_code, response.json()) == (
         401,
         {"detail": "Passkey verification failed"},
     )
-
-
-@pytest.fixture
-def authenticator() -> SoftwareAuthenticator:
-    return SoftwareAuthenticator()
 
 
 @pytest.fixture
@@ -512,13 +479,6 @@ def test_login_rejects_an_expired_challenge(
 
 
 # Current user
-
-
-@pytest.fixture
-def signed_in_headers(
-    client: TestClient, authenticator: SoftwareAuthenticator
-) -> dict[str, str]:
-    return auth_header(register(client, authenticator).access_token)
 
 
 def test_me_returns_the_current_user(

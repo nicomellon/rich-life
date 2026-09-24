@@ -33,6 +33,7 @@ from webauthn.helpers.structs import (
 
 from app.core.config import get_settings
 from app.models.passkey import ChallengeKind, Passkey, WebAuthnChallenge
+from app.models.spending_plan import SpendingPlan
 from app.models.user import User
 from app.schemas.user import Email
 from app.schemas.webauthn import (
@@ -87,7 +88,8 @@ def start_registration(db: Session, *, email: Email) -> RegistrationOptions:
 
 
 def finish_registration(db: Session, registration: RegistrationResponse) -> User:
-    """Verify the new passkey and create its account."""
+    """Verify the new passkey and create its account, with the default spending
+    plan."""
     settings = get_settings()
     transports = [
         AuthenticatorTransport(transport)
@@ -135,6 +137,8 @@ def finish_registration(db: Session, registration: RegistrationResponse) -> User
             transports=[transport.value for transport in transports],
         )
     )
+    # The column defaults give every new user the 50/10/20/20 plan.
+    db.add(SpendingPlan(user=user))
     try:
         # The unique index on email is the source of truth: of two sign-ups racing for
         # one email, one gets here.

@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db, get_engine
 from app.main import app
+from tests.accounts import auth_header, register
+from tests.authenticator import SoftwareAuthenticator
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
@@ -47,3 +49,16 @@ def client(db: Session) -> Generator[TestClient]:
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def authenticator() -> SoftwareAuthenticator:
+    return SoftwareAuthenticator()
+
+
+@pytest.fixture
+def signed_in_headers(
+    client: TestClient, authenticator: SoftwareAuthenticator
+) -> dict[str, str]:
+    """Authorization headers for a newly registered account (`tests.accounts.EMAIL`)."""
+    return auth_header(register(client, authenticator).access_token)
