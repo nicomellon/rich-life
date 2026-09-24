@@ -20,19 +20,18 @@ The plan below is split into GitHub issues, grouped by milestone. Each issue lis
 | `users` | id, email (unique), webauthn_user_handle (random bytes, unique), currency (ISO 4217, default `EUR`), created_at | No password. The email identifies the account and will receive magic links (Milestone 5). The WebAuthn user handle is sent to authenticators instead of the email or id. |
 | `passkeys` | id, user_id, credential_id (bytes, unique), public_key (bytes), sign_count, transports, created_at, last_used_at | One row per registered passkey; a user can have several. |
 | `webauthn_challenges` | id, challenge (bytes, unique), kind (`registration` / `authentication`), email and user handle (registration only), expires_at | Issued by the `*-challenge` endpoints and deleted when used, so each challenge works once. Expires after 5 minutes. |
-| `buckets` | id, user_id, kind (enum: `fixed_costs`, `investments`, `savings`, `guilt_free`), name, target_pct `NUMERIC(5,2)`, sort_order | This is the user's **default plan**. The 4 buckets are created at signup with 50/10/20/20. Percentages must add up to 100. |
-| `months` | id, user_id, year, month, income `NUMERIC(12,2)`, created_at; unique(user_id, year, month) | One row per budgeted month. |
-| `month_targets` | id, month_id, bucket_id, target_pct | **Copies** the bucket percentages when the month is created, so changing the default plan later does not rewrite past months. The user can edit these per month. |
-| `entries` | id, user_id, month_id, bucket_id, amount (>0), date, description, created_at | Actual expenses or allocations (an investment transfer counts as an entry in the Investments bucket too). `date` must fall inside the month. |
+| `spending_plans` | user_id (primary key), fixed_costs_pct, investments_pct, savings_pct, guilt_free_pct, each `NUMERIC(5,2)` | The user's **default plan**, created at signup with 50/10/20/20. The four buckets are the same for everyone, so they're columns rather than rows; in code they're the `Bucket` enum (`fixed_costs`, `investments`, `savings`, `guilt_free`). Percentages must add up to 100. |
+| `months` | id, user_id, year, month, income `NUMERIC(12,2)`, fixed_costs_pct, investments_pct, savings_pct, guilt_free_pct, created_at; unique(user_id, year, month) | One row per budgeted month. The percentages are **copied** from the spending plan when the month is created, so changing the default plan later does not rewrite past months. The user can edit them per month. |
+| `entries` | id, user_id, month_id, bucket (the `Bucket` enum), amount (>0), date, description, created_at | Actual expenses or allocations (an investment transfer counts as an entry in the Investments bucket too). `date` must fall inside the month. |
 
 Derived per month (computed on the fly, not stored): for each bucket, `target_amount = income × target_pct / 100`, `actual = sum(entries)`, `remaining = target − actual`, `actual_pct = actual / income`. Totals: planned, actual, unallocated.
 
 ## API surface (`/api/v1`)
 - Auth: `POST /auth/register-challenge` ({email}; returns WebAuthn creation options), `POST /auth/verify-registration` (the browser's credential; creates the user and passkey, returns a JWT access token), `POST /auth/login-challenge` (returns WebAuthn request options), `POST /auth/verify-login` (the browser's assertion; returns a JWT access token), `GET /auth/me`, `PATCH /auth/me` (currency)
 - Auth, after the MVP (Milestone 5): `POST /auth/magic-link` ({email}; emails a sign-in link), `POST /auth/magic-link/verify` ({token}; returns a JWT access token)
-- Plan: `GET /buckets`, `PUT /buckets` (update all percentages at once; validates sum = 100)
-- Months: `GET /months`, `POST /months` ({year, month, income}; copies targets), `GET /months/{y}/{m}`, `PATCH /months/{y}/{m}` (income), `PUT /months/{y}/{m}/targets`, `DELETE /months/{y}/{m}`
-- Entries: `GET /months/{y}/{m}/entries?bucket_id=`, `POST /months/{y}/{m}/entries`, `PATCH /entries/{id}`, `DELETE /entries/{id}`
+- Plan: `GET /spending-plan`, `PUT /spending-plan` (update all four percentages at once; validates sum = 100)
+- Months: `GET /months`, `POST /months` ({year, month, income}; copies targets), `GET /months/{y}/{m}`, `PATCH /months/{y}/{m}` (income), `PUT /months/{y}/{m}/targets` (this month's four percentages), `DELETE /months/{y}/{m}`
+- Entries: `GET /months/{y}/{m}/entries?bucket=`, `POST /months/{y}/{m}/entries`, `PATCH /entries/{id}`, `DELETE /entries/{id}`
 - Summary: `GET /months/{y}/{m}/summary` (target vs actual per bucket, plus totals)
 
 ---
@@ -82,9 +81,9 @@ Derived per month (computed on the fly, not stored): for each bucket, `target_am
 
 ## Milestone 2 — Spending plan (buckets and target percentages)
 
-**#8 Buckets model and API** — depends on #6
-- `buckets` model and migration. Create the 4 default buckets (50/10/20/20) when a user registers. `GET /buckets` and `PUT /buckets` validate that each percentage is between 0 and 100, the total is exactly 100, and all 4 kinds are present. The bucket name can be edited too.
-- AC: a new user has the 4 default buckets, a PUT whose total is not 100 returns 422, and the rule is covered by tests.
+**#8 Spending plan model and API** — depends on #6
+- `spending_plans` model and migration: one row per user with a percentage column per bucket. Create the default plan (50/10/20/20) when a user registers, and for existing users in the migration. `GET /spending-plan` and `PUT /spending-plan` validate that each percentage is between 0 and 100 with at most 2 decimals and that the total is exactly 100; a database check constraint enforces the total too. Bucket names are fixed labels in the frontend.
+- AC: a new user has the default plan, a PUT whose total is not 100 returns 422, and the rule is covered by tests.
 
 **#9 Spending plan settings page** — depends on #7, #8
 - A form with one percentage input per bucket, a live total indicator (shows a warning when it isn't 100%), and an optional preview ("with income X, each bucket gets …"). Saves through the API.
@@ -93,11 +92,11 @@ Derived per month (computed on the fly, not stored): for each bucket, `target_am
 ## Milestone 3 — Monthly management
 
 **#10 Months model and API (income + targets copy)** — depends on #8
-- `months` and `month_targets` models and migrations. Creating a month copies the current bucket percentages. Endpoints: list, get, update income, edit this month's targets (sum = 100), delete (cascades).
+- `months` model and migration, with the four percentage columns of `spending_plans`. Creating a month copies the current plan's percentages. Endpoints: list, get, update income, edit this month's targets (sum = 100), delete (cascades).
 - AC: changing the default plan after a month exists leaves that month's targets unchanged, and creating a duplicate month returns 409.
 
 **#11 Entries model and CRUD API** — depends on #10
-- `entries` model and migration. The amount must be > 0 and the date must fall within the month. Every query is filtered by `user_id`, so one user can never read or change another user's entries. Entries can be filtered by bucket.
+- `entries` model and migration. The amount must be > 0 and the date must fall within the month. Every query is filtered by `user_id`, so one user can never read or change another user's entries. Each entry names its bucket with the `Bucket` enum, and entries can be filtered by bucket.
 - AC: CRUD works, an entry dated outside its month returns 422, touching another user's entry returns 404, and all of this is tested.
 
 **#12 Monthly summary endpoint** — depends on #11
@@ -117,7 +116,7 @@ Derived per month (computed on the fly, not stored): for each bucket, `target_am
 - AC: the dashboard reflects the entries correctly and flags over-budget buckets.
 
 **#16 Per-month target override UI** — depends on #10, #15
-- On the dashboard, an "Adjust this month's plan" action edits `month_targets`, using the same validation component as #9.
+- On the dashboard, an "Adjust this month's plan" action edits the month's percentages, using the same validation component as #9.
 - AC: the override changes only that month's targets.
 
 ## Milestone 4 — Polish and release
