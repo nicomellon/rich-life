@@ -2,7 +2,6 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from httpx2 import Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -12,8 +11,14 @@ from app.models.month import Month
 from app.models.user import User
 from app.schemas.month import MonthCreate, MonthRead, MonthUpdate
 from app.schemas.spending_plan import SpendingPlanPercentages
-from tests.accounts import EMAIL, OTHER_EMAIL, auth_header, register
-from tests.authenticator import SoftwareAuthenticator
+from tests.accounts import EMAIL
+from tests.months import (
+    OCTOBER,
+    SEPTEMBER,
+    SEPTEMBER_PATH,
+    create_month,
+    send_json,
+)
 from tests.spending_plans import (
     DEFAULT_PLAN,
     NEW_PLAN,
@@ -22,38 +27,12 @@ from tests.spending_plans import (
     replace_plan,
 )
 
-SEPTEMBER = MonthCreate(year=2026, month=9, income=Decimal(3000))
-OCTOBER = MonthCreate(year=2026, month=10, income=Decimal(3200))
-SEPTEMBER_PATH = "/api/v1/months/2026/9"
 NEW_TARGETS = SpendingPlanPercentages(
     fixed_costs_pct=Decimal(60),
     investments_pct=Decimal(5),
     savings_pct=Decimal("12.5"),
     guilt_free_pct=Decimal("22.5"),
 )
-
-
-def send_json(
-    client: TestClient,
-    method: str,
-    path: str,
-    headers: dict[str, str],
-    request_body: BaseModel,
-) -> Response:
-    return client.request(
-        method,
-        path,
-        content=request_body.model_dump_json(),
-        headers={**headers, "Content-Type": "application/json"},
-    )
-
-
-def create_month(
-    client: TestClient, headers: dict[str, str], new_month: MonthCreate = SEPTEMBER
-) -> MonthRead:
-    response = send_json(client, "POST", "/api/v1/months", headers, new_month)
-    assert response.status_code == 201, response.text
-    return MonthRead.model_validate(response.json())
 
 
 def read_month(
@@ -92,14 +71,6 @@ def targets_of(month: MonthRead) -> SpendingPlanPercentages:
 
 def calendar_months(months: list[MonthRead]) -> list[tuple[int, int]]:
     return [(month.year, month.month) for month in months]
-
-
-@pytest.fixture
-def other_user_headers(client: TestClient) -> dict[str, str]:
-    """Authorization headers for a second account (`tests.accounts.OTHER_EMAIL`)."""
-    return auth_header(
-        register(client, SoftwareAuthenticator(), OTHER_EMAIL).access_token
-    )
 
 
 @pytest.fixture
