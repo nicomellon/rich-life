@@ -4,6 +4,7 @@ A personal finance app for planning and tracking monthly spending. Each month's 
 
 - Plan: [docs/mvp-plan.md](docs/mvp-plan.md)
 - How to contribute (branches, commits, pull requests): [CONTRIBUTING.md](CONTRIBUTING.md)
+- How to deploy: [docs/deployment.md](docs/deployment.md)
 
 ## Repository layout
 
@@ -12,8 +13,9 @@ A personal finance app for planning and tracking monthly spending. Each month's 
 | `backend/` | API: Python, FastAPI, Pydantic, SQLAlchemy, Alembic |
 | `frontend/` | Web app: React, TypeScript, Vite |
 | `docker-compose.yml` | Local PostgreSQL database and optional pgAdmin |
+| `docker-compose.prod.yml` | Production stack: database, API and web app behind Caddy (see [docs/deployment.md](docs/deployment.md)) |
 | `scripts/` | Repository tooling, such as the commit convention checker |
-| `docs/` | Plans and design notes |
+| `docs/` | Plans, design notes and the deployment guide |
 
 ## Prerequisites
 
@@ -73,3 +75,8 @@ To change the port or credentials, edit `.env`. If you change the user or databa
 | `make test` | Run all tests |
 | `make e2e` | Run the end-to-end tests in Chromium (starts the database, the API and the web app if they aren't running) |
 | `make lint` | Run all linters and formatting checks |
+| `make prod-smoke` | Build the production images and check the stack answers (see [docs/deployment.md](docs/deployment.md#try-it-locally)) |
+
+## Deployment
+
+The backend and the web app each have a Dockerfile, and `docker-compose.prod.yml` runs them with Postgres behind Caddy, which serves HTTPS. [docs/deployment.md](docs/deployment.md) explains how to deploy to a server or another platform. Passkeys are bound to the production domain, so choose it before anyone registers.
