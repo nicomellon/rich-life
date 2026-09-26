@@ -9,6 +9,7 @@ import {
   inSequence,
   jsonResponse,
   mockApi,
+  neverRespond,
   rentEntry,
   sentJsonBody,
   signedInUser,
@@ -17,6 +18,7 @@ import {
   summaryOfStartedMonth,
   wasSent,
 } from '@/test/api-mock'
+import { findLoadingSkeleton } from '@/test/loading-skeleton'
 import { renderApp } from '@/test/render-app'
 
 const lunchEntry: Entry = {
@@ -154,6 +156,32 @@ describe('MonthEntries', () => {
     renderApp('/')
 
     expect(await screen.findByRole('button', { name: 'Edit €1,200.00 entry' })).toBeInTheDocument()
+  })
+
+  it('shows a skeleton while the entries are loading', async () => {
+    mockEntriesApi({ 'GET /months/2026/9/entries': neverRespond })
+
+    renderApp('/')
+
+    expect(await findLoadingSkeleton('Loading your entries…')).toBeInTheDocument()
+  })
+
+  it('replaces the skeleton with the entries once they are loaded', async () => {
+    mockEntriesApi()
+    renderApp('/')
+
+    await bucketSection('Fixed Costs')
+
+    expect(screen.queryByText('Loading your entries…')).not.toBeInTheDocument()
+  })
+
+  it('removes the skeleton when the entries could not be loaded', async () => {
+    mockEntriesApi({ 'GET /months/2026/9/entries': respondWithServerError })
+    renderApp('/')
+
+    await screen.findByRole('alert')
+
+    expect(screen.queryByText('Loading your entries…')).not.toBeInTheDocument()
   })
 
   it('explains that the entries could not be loaded', async () => {
@@ -370,7 +398,7 @@ describe('MonthEntries', () => {
   })
 
   it("can't change the new entry while it is being added", async () => {
-    mockEntriesApi({ 'POST /months/2026/9/entries': () => new Promise<Response>(() => {}) })
+    mockEntriesApi({ 'POST /months/2026/9/entries': neverRespond })
     renderApp('/')
 
     await addLunch()
@@ -482,7 +510,7 @@ describe('MonthEntries', () => {
   })
 
   it("can't change the entry while it is being saved", async () => {
-    mockEntriesApi({ 'PATCH /entries/1': () => new Promise<Response>(() => {}) })
+    mockEntriesApi({ 'PATCH /entries/1': neverRespond })
     renderApp('/')
 
     await changeRent()

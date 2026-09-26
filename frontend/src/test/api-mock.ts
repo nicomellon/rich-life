@@ -39,6 +39,11 @@ export function mockApi(respondersByRequest: Record<string, ApiResponder>) {
   })
 }
 
+/** Never answers, so the request stays pending for the whole test. */
+export function neverRespond(): Promise<Response> {
+  return new Promise<Response>(() => {})
+}
+
 export function emptyResponse(): Response {
   return new Response(null, { status: 204 })
 }
