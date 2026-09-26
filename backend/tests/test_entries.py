@@ -258,6 +258,30 @@ def test_create_entry_with_an_invalid_value_points_at_its_field(
     ] == [invalid_field]
 
 
+def test_create_entry_with_a_zero_amount_returns_the_validation_error(
+    client: TestClient, signed_in_headers: dict[str, str], september: MonthRead
+) -> None:
+    response = client.post(
+        SEPTEMBER_ENTRIES_PATH,
+        json=entry_body("fixed_costs", "0", "2026-09-01"),
+        headers=signed_in_headers,
+    )
+
+    assert (
+        response.status_code,
+        ErrorResponse.model_validate(response.json()),
+    ) == (
+        422,
+        ErrorResponse(
+            detail="Some fields are invalid.",
+            code=ErrorCode.VALIDATION_FAILED,
+            fields=[
+                FieldError(field="amount", message="Input should be greater than 0")
+            ],
+        ),
+    )
+
+
 @pytest.mark.parametrize("method", ["GET", "POST"], ids=["list", "create"])
 def test_entries_of_a_month_that_does_not_exist_returns_404(
     client: TestClient, signed_in_headers: dict[str, str], method: str
