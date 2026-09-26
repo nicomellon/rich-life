@@ -1,9 +1,10 @@
 import type { AccessToken, User } from '@/auth/auth-api'
 import { setAccessToken } from '@/lib/auth-token'
+import type { Month } from '@/months/months-api'
 import type { SpendingPlanPercentages } from '@/spending-plan/spending-plan-api'
 
 /** Builds the response to one request; a fresh one each time, since a body can be read once. */
-type ApiResponder = () => Response
+export type ApiResponder = () => Response | Promise<Response>
 
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -48,6 +49,15 @@ export const defaultSpendingPlan: SpendingPlanPercentages = {
   investments_pct: '10.00',
   savings_pct: '20.00',
   guilt_free_pct: '20.00',
+}
+
+/** A month the user has started with the default plan, with an income of 3000. */
+export const startedSeptember2026: Month = {
+  year: 2026,
+  month: 9,
+  income: '3000.00',
+  ...defaultSpendingPlan,
+  created_at: '2026-09-01T10:00:00Z',
 }
 
 export const issuedAccessToken: AccessToken = { access_token: 'new-token', token_type: 'bearer' }
