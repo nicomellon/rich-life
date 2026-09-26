@@ -143,3 +143,13 @@ jobs:
           name: playwright-report
           path: frontend/playwright-report/
           retention-days: 14
+
+  # Builds both Dockerfiles and checks the stack from docker-compose.prod.yml answers.
+  # Deliberately not a required status check: leave it out of scripts/configure_repo.sh.
+  production-images:
+    name: Production images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and smoke test the production stack
+        run: make prod-smoke
