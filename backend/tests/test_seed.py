@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.entry import Entry
 from app.models.month import Month
+from app.models.spending_plan import Bucket
 from app.models.user import User
 from app.schemas.entry import EntryCreate, EntryRead
 from app.schemas.month import MonthRead
@@ -35,17 +36,23 @@ def list_months(client: TestClient, headers: dict[str, str]) -> list[MonthRead]:
     return [MonthRead.model_validate(month) for month in response.json()]
 
 
-def list_entry_descriptions(
+def list_entries(
     client: TestClient, headers: dict[str, str], calendar_month: CalendarMonth
-) -> list[str]:
-    """The descriptions of the month's entries, sorted."""
+) -> list[EntryRead]:
     response = client.get(
         f"/api/v1/months/{calendar_month.year}/{calendar_month.month}/entries",
         headers=headers,
     )
     assert response.status_code == 200, response.text
+    return [EntryRead.model_validate(entry) for entry in response.json()]
+
+
+def list_entry_descriptions(
+    client: TestClient, headers: dict[str, str], calendar_month: CalendarMonth
+) -> list[str]:
+    """The descriptions of the month's entries, sorted."""
     return sorted(
-        EntryRead.model_validate(entry).description for entry in response.json()
+        entry.description for entry in list_entries(client, headers, calendar_month)
     )
 
 
@@ -132,15 +139,18 @@ def test_seed_account_adds_each_months_example_entries(
     ]
 
 
-def list_entry_dates(
-    client: TestClient, headers: dict[str, str], calendar_month: CalendarMonth
-) -> list[dt.date]:
-    response = client.get(
-        f"/api/v1/months/{calendar_month.year}/{calendar_month.month}/entries",
-        headers=headers,
-    )
-    assert response.status_code == 200, response.text
-    return [EntryRead.model_validate(entry).date for entry in response.json()]
+def test_seed_account_adds_entries_in_every_bucket_to_each_month(
+    client: TestClient, db: Session, signed_in_headers: dict[str, str]
+) -> None:
+    seed_account(db, EMAIL, TODAY)
+
+    assert [
+        {
+            entry.bucket
+            for entry in list_entries(client, signed_in_headers, calendar_month)
+        }
+        for calendar_month in (JULY, AUGUST, SEPTEMBER_2026)
+    ] == [set(Bucket)] * 3
 
 
 def test_seed_account_leaves_out_current_month_entries_dated_after_today(
@@ -148,9 +158,9 @@ def test_seed_account_leaves_out_current_month_entries_dated_after_today(
 ) -> None:
     seed_account(db, EMAIL, dt.date(2026, 9, 2))
 
-    assert max(list_entry_dates(client, signed_in_headers, SEPTEMBER_2026)) == (
-        dt.date(2026, 9, 2)
-    )
+    assert max(
+        entry.date for entry in list_entries(client, signed_in_headers, SEPTEMBER_2026)
+    ) == dt.date(2026, 9, 2)
 
 
 def test_seed_account_early_in_the_month_adds_all_of_the_previous_months_entries(
