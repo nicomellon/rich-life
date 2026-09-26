@@ -55,8 +55,10 @@ check() {
 
 check "the web app is served at /" 200 '<div id="root">' "$base_url/"
 check "client-side routes load the web app" 200 '<div id="root">' "$base_url/plan"
-check "a sign-in challenge is issued, so migrations ran" 200 '"challenge"' \
-    --request POST "$base_url/api/v1/auth/login-challenge"
+# The relying party ID comes from DOMAIN, so this also shows the compose file wires the
+# domain into the backend's passkey settings.
+check "a sign-in challenge for the domain is issued, so migrations ran" 200 \
+    "\"rpId\":\"$DOMAIN\"" --request POST "$base_url/api/v1/auth/login-challenge"
 check "the API rejects requests without a token" 401 '"detail"' "$base_url/api/v1/months"
 
 # The script tag in index.html names the current build's JavaScript bundle.
