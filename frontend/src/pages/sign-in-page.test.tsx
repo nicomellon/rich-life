@@ -47,6 +47,7 @@ function mockSignInApi(verifyLoginResponder = () => jsonResponse(issuedAccessTok
     'POST /auth/login-challenge': () => jsonResponse(signInOptions),
     'POST /auth/verify-login': verifyLoginResponder,
     'GET /auth/me': () => jsonResponse(signedInUser),
+    'GET /months': () => jsonResponse([]),
   })
 }
 

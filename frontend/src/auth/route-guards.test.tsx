@@ -56,7 +56,10 @@ describe('RequireAuth', () => {
 describe('RequireSignedOut', () => {
   it('sends a signed-in user from the sign-in page to the dashboard', async () => {
     signInBeforeRender()
-    mockApi({ 'GET /auth/me': () => jsonResponse(signedInUser) })
+    mockApi({
+      'GET /auth/me': () => jsonResponse(signedInUser),
+      'GET /months': () => jsonResponse([]),
+    })
 
     renderApp('/sign-in')
 
