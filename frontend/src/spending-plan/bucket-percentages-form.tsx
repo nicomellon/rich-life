@@ -21,8 +21,17 @@ interface BucketPercentagesFormProps {
   /** Called with the new percentages, only when each is valid and they add up to 100. */
   onSave: (newPercentages: SpendingPlanPercentages) => void
   isSaving: boolean
+  /** The submit button's text, e.g. "Save plan". */
+  submitLabel: string
   /** Called whenever the user changes a field. */
   onEdit?: () => void
+  /**
+   * The income, as the API writes it, that the form previews each bucket's share of. Without it,
+   * the form has an optional field to type one.
+   */
+  previewIncome?: string
+  /** Shows a Cancel button that calls it. */
+  onCancel?: () => void
 }
 
 /**
@@ -33,7 +42,10 @@ export function BucketPercentagesForm({
   initialPercentages,
   onSave,
   isSaving,
+  submitLabel,
   onEdit,
+  previewIncome,
+  onCancel,
 }: BucketPercentagesFormProps) {
   const { data: currentUser } = useCurrentUser()
   // What the user typed, e.g. "12.5" for a saved "12.50".
@@ -49,7 +61,7 @@ export function BucketPercentagesForm({
   const allPercentagesValid = validBasisPoints.length === BUCKETS.length
   const totalBasisPoints = validBasisPoints.reduce((total, basisPoints) => total + basisPoints, 0)
   const canSave = allPercentagesValid && totalBasisPoints === FULL_PLAN_BASIS_POINTS
-  const incomeInCents = parseAmountInCents(typedIncome)
+  const incomeInCents = parseAmountInCents(previewIncome ?? typedIncome)
 
   function changePercentage(bucket: Bucket, typedPercentage: string) {
     setTypedPercentages((previousTypedPercentages) => ({
@@ -73,22 +85,24 @@ export function BucketPercentagesForm({
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit} noValidate>
-      <div className="space-y-2">
-        <Label htmlFor="preview-income">Monthly income (optional)</Label>
-        <Input
-          id="preview-income"
-          inputMode="decimal"
-          autoComplete="off"
-          placeholder="e.g. 3000"
-          className="max-w-48"
-          aria-describedby="preview-income-hint"
-          value={typedIncome}
-          onChange={(event) => setTypedIncome(event.target.value)}
-        />
-        <p id="preview-income-hint" className="text-sm text-muted-foreground">
-          Previews how much each bucket gets. It isn't saved.
-        </p>
-      </div>
+      {previewIncome === undefined && (
+        <div className="space-y-2">
+          <Label htmlFor="preview-income">Monthly income (optional)</Label>
+          <Input
+            id="preview-income"
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="e.g. 3000"
+            className="max-w-48"
+            aria-describedby="preview-income-hint"
+            value={typedIncome}
+            onChange={(event) => setTypedIncome(event.target.value)}
+          />
+          <p id="preview-income-hint" className="text-sm text-muted-foreground">
+            Previews how much each bucket gets. It isn't saved.
+          </p>
+        </div>
+      )}
 
       <div className="divide-y rounded-md border">
         {BUCKETS.map((bucket) => {
@@ -138,9 +152,16 @@ export function BucketPercentagesForm({
           : 'Enter a valid percentage for every bucket to see the total.'}
       </div>
 
-      <Button type="submit" disabled={!canSave || isSaving}>
-        {isSaving ? 'Saving…' : 'Save plan'}
-      </Button>
+      <div className="flex gap-2">
+        <Button type="submit" disabled={!canSave || isSaving}>
+          {isSaving ? 'Saving…' : submitLabel}
+        </Button>
+        {onCancel && (
+          <Button type="button" variant="outline" disabled={isSaving} onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
+      </div>
     </form>
   )
 }

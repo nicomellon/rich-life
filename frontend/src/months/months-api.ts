@@ -33,6 +33,14 @@ export function updateMonthIncome({ year, month }: CalendarMonth, income: string
   return api.patch<Month>(`/months/${year}/${month}`, { income })
 }
 
+/** Replaces the month's targets; the spending plan and other months keep theirs. */
+export function updateMonthTargets(
+  { year, month }: CalendarMonth,
+  newTargets: SpendingPlanPercentages,
+): Promise<Month> {
+  return api.put<Month>(`/months/${year}/${month}/targets`, newTargets)
+}
+
 /** `months` with `savedMonth` added, or replacing the stored copy, kept newest first. */
 export function withSavedMonth(months: Month[], savedMonth: Month): Month[] {
   return [

@@ -4,6 +4,7 @@ import { useCurrentUser } from '@/auth/auth-context'
 import { formatApiAmount } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { MonthIncome } from '@/months/month-income'
+import { MonthTargetsEditor } from '@/months/month-targets-editor'
 import type { Month } from '@/months/months-api'
 import { BucketSummaryCard } from '@/summary/bucket-summary-card'
 import { PlanVsActualChart } from '@/summary/plan-vs-actual-chart'
@@ -16,7 +17,8 @@ interface MonthPlanVsActualProps {
 
 /**
  * The month's totals (its editable income, what's spent and allocated, and what's left), each
- * bucket's target next to its actual amount, and a chart comparing them.
+ * bucket's target next to its actual amount, a chart comparing them, and a way to adjust this
+ * month's targets.
  */
 export function MonthPlanVsActual({ month }: MonthPlanVsActualProps) {
   const { data: currentUser } = useCurrentUser()
@@ -63,23 +65,28 @@ export function MonthPlanVsActual({ month }: MonthPlanVsActualProps) {
           We couldn't update this month's totals. Please reload the page.
         </p>
       )}
-      {monthSummary && (
-        <section className="space-y-4">
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">Plan vs actual</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {monthSummary.buckets.map((bucketSummary) => (
-              <BucketSummaryCard
-                key={bucketSummary.bucket}
-                bucketSummary={bucketSummary}
-                formatAmount={formatAmount}
-              />
-            ))}
-          </div>
-          {currentUser && (
-            <PlanVsActualChart monthSummary={monthSummary} currency={currentUser.currency} />
-          )}
-        </section>
-      )}
+          <MonthTargetsEditor month={month} />
+        </div>
+        {monthSummary && (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {monthSummary.buckets.map((bucketSummary) => (
+                <BucketSummaryCard
+                  key={bucketSummary.bucket}
+                  bucketSummary={bucketSummary}
+                  formatAmount={formatAmount}
+                />
+              ))}
+            </div>
+            {currentUser && (
+              <PlanVsActualChart monthSummary={monthSummary} currency={currentUser.currency} />
+            )}
+          </>
+        )}
+      </section>
     </div>
   )
 }
