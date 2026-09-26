@@ -25,6 +25,7 @@ describe('toPlanVsActualRows', () => {
 
     expect(bucketLabels).toEqual(['Fixed Costs', 'Investments', 'Savings', 'Guilt-Free Spending'])
   })
+
   it.each([
     ['below its target', '1200.00', 'var(--status-under)'],
     ['within 5% of its target', '1550.00', 'var(--status-on-track)'],
