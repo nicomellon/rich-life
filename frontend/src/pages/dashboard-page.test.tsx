@@ -13,7 +13,7 @@ import {
   startedSeptember2026,
   summaryOfStartedMonth,
 } from '@/test/api-mock'
-import { findLoadingSkeleton } from '@/test/loading-skeleton'
+import { findLoadingSkeleton, unlabelledBusySkeletons } from '@/test/loading-skeleton'
 import { createTestQueryClient, renderApp } from '@/test/render-app'
 
 const startedJuly2026: Month = { ...startedSeptember2026, month: 7, income: '2800.00' }
@@ -217,6 +217,15 @@ describe('DashboardPage', () => {
     renderApp('/')
 
     expect(await findLoadingSkeleton('Loading your months…')).toBeInTheDocument()
+  })
+
+  it('marks the month picker skeleton busy while the months are loading', async () => {
+    mockMonthsApi({ 'GET /months': neverRespond })
+    renderApp('/')
+
+    await findLoadingSkeleton('Loading your months…')
+
+    expect(unlabelledBusySkeletons()).toHaveLength(1)
   })
 
   it('shows no month picker while the months are loading', async () => {

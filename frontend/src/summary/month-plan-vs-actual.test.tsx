@@ -13,7 +13,7 @@ import {
   startedSeptember2026,
   summaryOfStartedMonth,
 } from '@/test/api-mock'
-import { findLoadingSkeleton } from '@/test/loading-skeleton'
+import { findLoadingSkeleton, unlabelledBusySkeletons } from '@/test/loading-skeleton'
 import { renderApp } from '@/test/render-app'
 
 const summaryWithRent = summaryOfStartedMonth({ fixed_costs: '1200.00' })
@@ -312,6 +312,15 @@ describe('MonthPlanVsActual', () => {
     renderApp('/')
 
     expect(await findLoadingSkeleton("Loading this month's totals…")).toBeInTheDocument()
+  })
+
+  it("marks both totals' skeletons busy while the month's totals are loading", async () => {
+    mockSummaryApi({ 'GET /months/2026/9/summary': neverRespond })
+    renderApp('/')
+
+    await findLoadingSkeleton("Loading this month's totals…")
+
+    expect(unlabelledBusySkeletons()).toHaveLength(2)
   })
 
   it("replaces the skeleton with the month's totals once they are loaded", async () => {
