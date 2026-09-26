@@ -21,3 +21,8 @@ export function toApiAmount(cents: number): string {
   const centDigits = String(cents % 100).padStart(2, '0')
   return `${Math.floor(cents / 100)}.${centDigits}`
 }
+
+/** An amount as the API writes it for display, e.g. "1500.00" in EUR as "€1,500.00". */
+export function formatApiAmount(apiAmount: string, currency: string): string {
+  return formatMoney(Math.round(Number(apiAmount) * 100), currency)
+}
