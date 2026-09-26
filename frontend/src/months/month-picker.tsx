@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { NativeSelect } from '@/components/ui/native-select'
 import {
   addMonths,
   compareNewestFirst,
@@ -47,9 +48,8 @@ export function MonthPicker({ selectedMonth, startedMonths, onSelect }: MonthPic
       >
         <ChevronLeft />
       </Button>
-      <select
+      <NativeSelect
         aria-label="Month"
-        className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
         value={selectedMonthKey}
         onChange={(event) => selectMonthKey(event.target.value)}
       >
@@ -58,7 +58,7 @@ export function MonthPicker({ selectedMonth, startedMonths, onSelect }: MonthPic
             {formatCalendarMonth(listedMonth)}
           </option>
         ))}
-      </select>
+      </NativeSelect>
       <Button
         variant="outline"
         size="icon"
