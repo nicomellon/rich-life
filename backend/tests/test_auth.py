@@ -55,7 +55,10 @@ def expire_all_challenges(db: Session) -> None:
 def assert_verification_failed(response: Response) -> None:
     assert (response.status_code, response.json()) == (
         401,
-        {"detail": "Passkey verification failed"},
+        {
+            "detail": "Passkey verification failed",
+            "code": "passkey_verification_failed",
+        },
     )
 
 
@@ -139,7 +142,7 @@ def test_register_challenge_for_a_registered_email_returns_409(
 
     assert (response.status_code, response.json()) == (
         409,
-        {"detail": "Email already registered"},
+        {"detail": "Email already registered", "code": "email_already_registered"},
     )
 
 
@@ -545,6 +548,15 @@ def test_me_without_a_valid_token_returns_401(
     assert (response.status_code, response.headers["www-authenticate"]) == (
         401,
         "Bearer",
+    )
+
+
+def test_me_without_a_token_returns_not_authenticated(client: TestClient) -> None:
+    response = client.get("/api/v1/auth/me")
+
+    assert (response.status_code, response.json()) == (
+        401,
+        {"detail": "Not authenticated", "code": "not_authenticated"},
     )
 
 

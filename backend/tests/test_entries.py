@@ -4,7 +4,6 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
-from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -13,6 +12,7 @@ from app.models.entry import Entry
 from app.models.spending_plan import Bucket
 from app.models.user import User
 from app.schemas.entry import EntryCreate, EntryRead, EntryUpdate
+from app.schemas.error import ErrorCode, ErrorResponse, FieldError
 from app.schemas.month import MonthRead
 from tests.accounts import EMAIL
 from tests.entries import SEPTEMBER_ENTRIES_PATH, create_entry, post_entry
@@ -38,15 +38,6 @@ DINNER = EntryCreate(
     date=dt.date(2026, 9, 12),
     description="Dinner out",
 )
-
-
-class ValidationErrorDetail(BaseModel):
-    type: str
-    loc: list[str]
-
-
-class ValidationErrorBody(BaseModel):
-    detail: list[ValidationErrorDetail]
 
 
 def entry_path(entry: EntryRead) -> str:
@@ -185,8 +176,14 @@ def test_create_entry_dated_outside_its_month_points_at_the_date(
         client, signed_in_headers, RENT.model_copy(update={"date": OCTOBER_FIRST})
     )
 
-    assert ValidationErrorBody.model_validate(response.json()) == ValidationErrorBody(
-        detail=[ValidationErrorDetail(type="date_outside_month", loc=["body", "date"])]
+    assert ErrorResponse.model_validate(response.json()) == ErrorResponse(
+        detail="Some fields are invalid.",
+        code=ErrorCode.VALIDATION_FAILED,
+        fields=[
+            FieldError(
+                field="date", message="The date must fall within the entry's month"
+            )
+        ],
     )
 
 
@@ -232,6 +229,35 @@ def test_create_entry_with_an_invalid_body_returns_422(
     assert response.status_code == 422
 
 
+@pytest.mark.parametrize(
+    ("invalid_entry_body", "invalid_field"),
+    [
+        (entry_body("fixed_costs", "0", "2026-09-01"), "amount"),
+        (entry_body("groceries", "1", "2026-09-01"), "bucket"),
+        (
+            {**entry_body("fixed_costs", "1", "2026-09-01"), "description": "x" * 256},
+            "description",
+        ),
+    ],
+    ids=["zero-amount", "unknown-bucket", "description-too-long"],
+)
+def test_create_entry_with_an_invalid_value_points_at_its_field(
+    client: TestClient,
+    signed_in_headers: dict[str, str],
+    september: MonthRead,
+    invalid_entry_body: dict[str, str],
+    invalid_field: str,
+) -> None:
+    response = client.post(
+        SEPTEMBER_ENTRIES_PATH, json=invalid_entry_body, headers=signed_in_headers
+    )
+
+    assert [
+        error.field
+        for error in ErrorResponse.model_validate(response.json()).fields or []
+    ] == [invalid_field]
+
+
 @pytest.mark.parametrize("method", ["GET", "POST"], ids=["list", "create"])
 def test_entries_of_a_month_that_does_not_exist_returns_404(
     client: TestClient, signed_in_headers: dict[str, str], method: str
@@ -245,7 +271,7 @@ def test_entries_of_a_month_that_does_not_exist_returns_404(
 
     assert (response.status_code, response.json()) == (
         404,
-        {"detail": "Month not found"},
+        {"detail": "Month not found", "code": "month_not_found"},
     )
 
 
@@ -256,7 +282,7 @@ def test_create_entry_in_another_users_month_returns_404(
 
     assert (response.status_code, response.json()) == (
         404,
-        {"detail": "Month not found"},
+        {"detail": "Month not found", "code": "month_not_found"},
     )
 
 
@@ -355,7 +381,7 @@ def test_list_another_users_entries_returns_404(
 
     assert (response.status_code, response.json()) == (
         404,
-        {"detail": "Month not found"},
+        {"detail": "Month not found", "code": "month_not_found"},
     )
 
 
@@ -487,7 +513,7 @@ def test_patch_another_users_entry_returns_404(
 
     assert (response.status_code, response.json()) == (
         404,
-        {"detail": "Entry not found"},
+        {"detail": "Entry not found", "code": "entry_not_found"},
     )
 
 
@@ -528,7 +554,7 @@ def test_delete_another_users_entry_returns_404(
 
     assert (response.status_code, response.json()) == (
         404,
-        {"detail": "Entry not found"},
+        {"detail": "Entry not found", "code": "entry_not_found"},
     )
 
 
@@ -559,7 +585,7 @@ def test_entry_that_does_not_exist_returns_404(
 
     assert (response.status_code, response.json()) == (
         404,
-        {"detail": "Entry not found"},
+        {"detail": "Entry not found", "code": "entry_not_found"},
     )
 
 

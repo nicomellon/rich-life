@@ -5,11 +5,18 @@ from fastapi import APIRouter, Query, Response, status
 from fastapi.exceptions import RequestValidationError
 
 from app.api.deps import CurrentUser, DbSession, RequestedEntry, RequestedMonth
+from app.api.errors import (
+    ENTRY_NOT_FOUND,
+    MONTH_NOT_FOUND,
+    NOT_AUTHENTICATED,
+    VALIDATION_FAILED,
+    error_responses,
+)
 from app.models.spending_plan import Bucket
 from app.schemas.entry import EntryCreate, EntryRead, EntryUpdate
 from app.services import entries
 
-router = APIRouter(tags=["entries"])
+router = APIRouter(tags=["entries"], responses=error_responses(NOT_AUTHENTICATED))
 
 
 class ValidationErrorDetail(TypedDict):
@@ -39,7 +46,7 @@ def date_outside_month_error(entry_date: dt.date) -> RequestValidationError:
 @router.get(
     "/months/{year}/{month}/entries",
     summary="List a month's entries",
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Month not found"}},
+    responses=error_responses(MONTH_NOT_FOUND, VALIDATION_FAILED),
 )
 def list_entries(
     requested_month: RequestedMonth,
@@ -58,7 +65,7 @@ def list_entries(
     "/months/{year}/{month}/entries",
     status_code=status.HTTP_201_CREATED,
     summary="Add an entry to a month",
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Month not found"}},
+    responses=error_responses(MONTH_NOT_FOUND, VALIDATION_FAILED),
 )
 def create_entry(
     new_entry: EntryCreate,
@@ -77,7 +84,7 @@ def create_entry(
 @router.patch(
     "/entries/{entry_id}",
     summary="Change an entry",
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Entry not found"}},
+    responses=error_responses(ENTRY_NOT_FOUND, VALIDATION_FAILED),
 )
 def update_entry(
     entry_update: EntryUpdate, requested_entry: RequestedEntry, db: DbSession
@@ -95,7 +102,7 @@ def update_entry(
     "/entries/{entry_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete an entry",
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Entry not found"}},
+    responses=error_responses(ENTRY_NOT_FOUND, VALIDATION_FAILED),
 )
 def delete_entry(requested_entry: RequestedEntry, db: DbSession) -> Response:
     db.delete(requested_entry)
