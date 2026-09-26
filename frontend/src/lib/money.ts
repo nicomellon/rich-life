@@ -15,3 +15,9 @@ export function parseAmountInCents(typedAmount: string): number | null {
 export function formatMoney(cents: number, currency: string): string {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(cents / 100)
 }
+
+/** Cents as the API's decimal string, e.g. 300050 as "3000.50". */
+export function toApiAmount(cents: number): string {
+  const centDigits = String(cents % 100).padStart(2, '0')
+  return `${Math.floor(cents / 100)}.${centDigits}`
+}
