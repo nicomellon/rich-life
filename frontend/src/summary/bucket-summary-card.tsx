@@ -41,6 +41,7 @@ export function BucketSummaryCard({ bucketSummary, formatAmount }: BucketSummary
       {/* The amounts below say the same, so the bar is only for the eye. */}
       <div aria-hidden="true" className="h-2 overflow-hidden rounded-full bg-muted">
         <div
+          data-testid="progress-fill"
           className={cn('h-full rounded-full', BUCKET_STATUS_FILL_CLASSES[status])}
           style={{ width: `${progressPercentage(bucketSummary)}%` }}
         />

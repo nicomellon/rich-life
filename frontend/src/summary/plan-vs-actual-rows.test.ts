@@ -12,6 +12,7 @@ describe('toPlanVsActualRows', () => {
       targetAmount: 1500,
       actualAmount: 1600.5,
       status: 'over',
+      actualBarColor: 'var(--status-over)',
     })
   })
 
@@ -24,4 +25,18 @@ describe('toPlanVsActualRows', () => {
 
     expect(bucketLabels).toEqual(['Fixed Costs', 'Investments', 'Savings', 'Guilt-Free Spending'])
   })
+  it.each([
+    ['below its target', '1200.00', 'var(--status-under)'],
+    ['within 5% of its target', '1550.00', 'var(--status-on-track)'],
+    ['over its target', '1600.00', 'var(--status-over)'],
+  ])(
+    "colours a bucket's actual bar when it's %s",
+    (_, fixedCostsActualAmount, expectedActualBarColor) => {
+      const monthSummary = summaryOfStartedMonth({ fixed_costs: fixedCostsActualAmount })
+
+      const fixedCostsRow = toPlanVsActualRows(monthSummary)[0]
+
+      expect(fixedCostsRow?.actualBarColor).toBe(expectedActualBarColor)
+    },
+  )
 })

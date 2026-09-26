@@ -58,10 +58,7 @@ export function PlanVsActualChart({ monthSummary, currency }: PlanVsActualChartP
         <Bar dataKey="targetAmount" name="Target" fill="var(--chart-target)" radius={4} />
         <Bar dataKey="actualAmount" name="Actual" fill="var(--status-under)" radius={4}>
           {planVsActualRows.map((planVsActualRow) => (
-            <Cell
-              key={planVsActualRow.bucketLabel}
-              fill={BUCKET_STATUS_COLORS[planVsActualRow.status]}
-            />
+            <Cell key={planVsActualRow.bucketLabel} fill={planVsActualRow.actualBarColor} />
           ))}
         </Bar>
       </BarChart>

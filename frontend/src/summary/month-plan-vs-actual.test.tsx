@@ -143,6 +143,44 @@ describe('MonthPlanVsActual', () => {
     expect(within(await bucketCard('Fixed Costs')).getByText(expectedStatusLabel)).toBeVisible()
   })
 
+  it.each([
+    ['below its target', '1200.00', 'Under target', 'text-status-under'],
+    ['within 5% of its target', '1550.00', 'On track', 'text-status-on-track'],
+    ['over its target', '1600.00', 'Over budget', 'text-status-over'],
+  ])(
+    'colours the status badge of a bucket %s',
+    async (_, fixedCostsActualAmount, statusLabel, expectedColorClass) => {
+      mockSummaryApi({
+        'GET /months/2026/9/summary': respondWithSummary({ fixed_costs: fixedCostsActualAmount }),
+      })
+
+      renderApp('/')
+
+      expect(within(await bucketCard('Fixed Costs')).getByText(statusLabel)).toHaveClass(
+        expectedColorClass,
+      )
+    },
+  )
+
+  it.each([
+    ['below its target', '1200.00', 'bg-status-under'],
+    ['within 5% of its target', '1550.00', 'bg-status-on-track'],
+    ['over its target', '1600.00', 'bg-status-over'],
+  ])(
+    "fills the progress bar of a bucket %s in its status's colour",
+    async (_, fixedCostsActualAmount, expectedFillClass) => {
+      mockSummaryApi({
+        'GET /months/2026/9/summary': respondWithSummary({ fixed_costs: fixedCostsActualAmount }),
+      })
+
+      renderApp('/')
+
+      expect(within(await bucketCard('Fixed Costs')).getByTestId('progress-fill')).toHaveClass(
+        expectedFillClass,
+      )
+    },
+  )
+
   it('shows a card for every bucket', async () => {
     mockSummaryApi()
 
