@@ -126,6 +126,7 @@ test.describe('a month planned and tracked from registration', () => {
   test('dashboard shows the income left unallocated', async () => {
     const unallocatedTotal = dashboardPage.getByRole('group', { name: 'Unallocated' })
 
-    await expect(unallocatedTotal.locator('p').last()).toHaveText('€500.00')
+    // Exact, so "-€500.00" doesn't match.
+    await expect(unallocatedTotal.getByText('€500.00', { exact: true })).toBeVisible()
   })
 })
