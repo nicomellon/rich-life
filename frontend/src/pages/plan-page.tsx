@@ -36,6 +36,7 @@ export function PlanPage() {
           initialPercentages={spendingPlanQuery.data}
           onSave={saveMutation.mutate}
           isSaving={saveMutation.isPending}
+          submitLabel="Save plan"
           onEdit={saveMutation.reset}
         />
       )}
