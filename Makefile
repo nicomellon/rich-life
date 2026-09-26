@@ -66,6 +66,10 @@ db-shell: ## Open psql in the database container
 pgadmin: ## Start pgAdmin on http://localhost:5050 (with the database)
 	$(COMPOSE) --profile tools up -d --wait
 
+.PHONY: prod-smoke
+prod-smoke: ## Build the production stack, check it answers on http://localhost:8080, remove it
+	sh scripts/smoke_test_production.sh
+
 .PHONY: test
 test: ## Run all tests
 	python3 -m unittest discover -s scripts/tests

@@ -1,0 +1,43 @@
+# Web server for the production image. Settings come from the environment:
+#
+#   SITE_ADDRESS  What Caddy serves. A domain such as app.example.com gets HTTPS with an
+#                 automatic Let's Encrypt certificate; http://localhost serves plain HTTP
+#                 for a local trial; :80 serves plain HTTP behind a platform that
+#                 terminates TLS itself. Default: :80.
+#   API_UPSTREAM  Address of the backend. Default: backend:8000, the compose service.
+
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	header {
+		# Browsers only honour this over HTTPS, so it's harmless on a plain HTTP trial.
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		# No site may show the app in a frame, which rules out clickjacking.
+		Content-Security-Policy "frame-ancestors 'none'"
+	}
+
+	handle /api/* {
+		reverse_proxy {$API_UPSTREAM:backend:8000}
+	}
+
+	# Vite fingerprints everything under /assets, so a file never changes under its name
+	# and can be cached for good. A missing one is a 404, never the app's HTML: a tab
+	# left open across a deploy may still ask for the previous build's files.
+	handle /assets/* {
+		root * /srv
+		@asset_exists file
+		header @asset_exists Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	handle {
+		root * /srv
+		# index.html names the current build's assets, so browsers revalidate it.
+		header Cache-Control no-cache
+		# Client-side routes such as /plan load the app, which routes itself.
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -16,6 +16,8 @@ uv run --env-file ../.env uvicorn app.main:app --reload
 - Health check: http://localhost:8000/health
 - Interactive API docs: http://localhost:8000/docs
 
+In production the API runs from the image built by `Dockerfile`. Its entrypoint, `docker-entrypoint.sh`, applies the migrations and then starts uvicorn on port 8000. See [docs/deployment.md](../docs/deployment.md).
+
 ## Configuration
 
 Following the [twelve-factor](https://12factor.net/config) approach, `app/core/config.py` reads settings **only from environment variables**; the app never opens a `.env` file itself. For local development, `make backend` loads the root `.env` (the same one docker compose uses) into the environment with `uv run --env-file`. You can use any other tool for that instead, such as direnv or `UV_ENV_FILE=../.env`. In production, set real environment variables. See `.env.example` for the defaults.

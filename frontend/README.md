@@ -16,7 +16,7 @@ Plain `npm run dev` works too; without `API_PROXY_TARGET` in the environment it 
 
 ## Configuration
 
-The built app has **no configuration of its own**: it calls the API on the origin it's served from, under `/api/v1`. The server in front of it decides where `/api` goes. In development that's the Vite dev server (and `npm run preview`), which proxies `/api` to the backend. In production it will be the web server that serves `dist/` (#20). One build can therefore run in any environment, and the browser never makes a cross-origin request, so CORS doesn't come into play.
+The built app has **no configuration of its own**: it calls the API on the origin it's served from, under `/api/v1`. The server in front of it decides where `/api` goes. In development that's the Vite dev server (and `npm run preview`), which proxies `/api` to the backend. In production it's Caddy, which serves `dist/` in the image built by `Dockerfile` and proxies `/api` to the backend (`Caddyfile`; see [docs/deployment.md](../docs/deployment.md)). One build can therefore run in any environment, and the browser never makes a cross-origin request, so CORS doesn't come into play.
 
 Following the [twelve-factor](https://12factor.net/config) approach, the dev server reads its settings **only from environment variables**. Vite's own `.env` file loading is turned off (`envDir: false` in `vite.config.ts`). For local development, `make frontend` loads the root `.env` into the environment with `node --env-file`; direnv or exporting the variables in your shell works just as well.
 
