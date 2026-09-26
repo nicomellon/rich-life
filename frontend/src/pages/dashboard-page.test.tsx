@@ -33,11 +33,6 @@ function mockStartedMonthsApi(extraResponders: Record<string, ApiResponder> = {}
   })
 }
 
-/** How many requests were sent to `url`, whatever their method. */
-function sentRequestCount(fetchMock: ReturnType<typeof mockApi>, url: string): number {
-  return fetchMock.mock.calls.filter(([input]) => String(input) === url).length
-}
-
 /** Answers each request with the next responder, repeating the last one. */
 function inSequence(...responders: ApiResponder[]): ApiResponder {
   let requestCount = 0
@@ -180,14 +175,22 @@ describe('DashboardPage', () => {
   })
 
   it('does not report a failure when the month was already started elsewhere', async () => {
-    const fetchMock = mockMonthsApi({
-      'POST /months': () => jsonResponse({ detail: 'Month already exists' }, 409),
+    let answerAlreadyStarted = () => {}
+    mockMonthsApi({
+      'POST /months': () =>
+        new Promise<Response>((resolve) => {
+          answerAlreadyStarted = () =>
+            resolve(jsonResponse({ detail: 'Month already exists' }, 409))
+        }),
     })
     renderApp('/')
-
     await startMonthWithIncome('3000')
+    await screen.findByRole('button', { name: 'Starting…' })
 
-    await waitFor(() => expect(sentRequestCount(fetchMock, '/api/v1/months')).toBe(3))
+    answerAlreadyStarted()
+
+    // The button is back once the request has failed, in the same render as any alert.
+    await screen.findByRole('button', { name: 'Start this month' })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
