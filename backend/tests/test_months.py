@@ -91,8 +91,17 @@ def september(client: TestClient, signed_in_headers: dict[str, str]) -> MonthRea
         ("PATCH", SEPTEMBER_PATH),
         ("PUT", f"{SEPTEMBER_PATH}/targets"),
         ("DELETE", SEPTEMBER_PATH),
+        ("GET", f"{SEPTEMBER_PATH}/summary"),
     ],
-    ids=["list", "create", "get", "update-income", "update-targets", "delete"],
+    ids=[
+        "list",
+        "create",
+        "get",
+        "update-income",
+        "update-targets",
+        "delete",
+        "summary",
+    ],
 )
 def test_months_without_a_token_returns_401(
     client: TestClient, method: str, path: str
@@ -272,8 +281,9 @@ def test_get_month_returns_the_month(
         ("PATCH", SEPTEMBER_PATH, MonthUpdate(income=Decimal(1))),
         ("PUT", f"{SEPTEMBER_PATH}/targets", NEW_TARGETS),
         ("DELETE", SEPTEMBER_PATH, None),
+        ("GET", f"{SEPTEMBER_PATH}/summary", None),
     ],
-    ids=["get", "update-income", "update-targets", "delete"],
+    ids=["get", "update-income", "update-targets", "delete", "summary"],
 )
 def test_month_that_does_not_exist_returns_404(
     client: TestClient,
