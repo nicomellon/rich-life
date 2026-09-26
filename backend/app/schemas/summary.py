@@ -11,9 +11,10 @@ from app.schemas.spending_plan import Percentage
 # An amount in the user's currency that can be negative, e.g. the -50.00 remaining in a
 # bucket 50.00 over its target. Like the income, JSON output carries it as a string.
 SignedAmount = Annotated[Decimal, Field(decimal_places=2)]
-# A sum of entries' amounts, e.g. 1200.00. Unlike a single amount it has no upper
-# limit.
-AmountSum = Annotated[Decimal, Field(ge=0, decimal_places=2)]
+# An amount in the user's currency that can't be negative, e.g. a bucket's 1500.00
+# target or the 1200.00 its entries add up to. Unlike a single entry's amount it has no
+# upper limit, since a sum of entries can grow past it.
+NonNegativeAmount = Annotated[Decimal, Field(ge=0, decimal_places=2)]
 # A share of the month's income that can exceed 100, e.g. 110.00 when a bucket's
 # entries add up to more than the income.
 ShareOfIncome = Annotated[Decimal, Field(ge=0, decimal_places=2)]
@@ -33,8 +34,8 @@ class BucketSummary(BaseModel):
 
     bucket: Bucket
     target_pct: Percentage
-    target_amount: Income
-    actual_amount: AmountSum
+    target_amount: NonNegativeAmount
+    actual_amount: NonNegativeAmount
     actual_pct: ShareOfIncome
     # Negative when the entries add up to more than the target.
     remaining: SignedAmount
@@ -47,6 +48,6 @@ class MonthSummary(BaseModel):
 
     income: Income
     buckets: list[BucketSummary]
-    total_actual: AmountSum
+    total_actual: NonNegativeAmount
     # Negative when the entries add up to more than the income.
     unallocated: SignedAmount
