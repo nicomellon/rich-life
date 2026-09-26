@@ -37,6 +37,7 @@ Following the [twelve-factor](https://12factor.net/config) approach, the dev ser
 | `src/lib/api.ts` | API client: a `fetch` wrapper that adds the `/api/v1` prefix and the access token, parses JSON and throws `ApiError` on non-2xx responses |
 | `src/lib/auth-token.ts` | Access token storage (localStorage), with change notifications across tabs |
 | `src/lib/query-client.ts` | TanStack Query defaults (no retries on 4xx) |
+| `e2e/` | Playwright end-to-end tests, run against the real API and web app |
 | `src/test/` | Vitest setup (jest-dom matchers, per-test cleanup) and helpers: `renderApp` renders the whole app at a path, `mockApi` fakes the backend |
 
 Import from `src` with the `@/` alias, e.g. `import { api } from '@/lib/api'`.
@@ -77,3 +78,13 @@ npm run build          # type check and production build into dist/
 ```
 
 `make test` and `make lint` from the repository root run these along with the backend's checks.
+
+### End-to-end tests
+
+The Playwright tests in `e2e/` drive the whole app in Chromium: they register with a passkey, set the spending plan, start a month, add entries and check the dashboard. Passkeys use Chromium's virtual authenticator (the DevTools Protocol's `WebAuthn.addVirtualAuthenticator`), so no real device or biometric prompt is involved.
+
+```sh
+make e2e   # from the repository root
+```
+
+`make e2e` starts the database, applies the migrations and runs `playwright test` with the root `.env` in its environment. Playwright starts the API on port 8000 and the web app on port 5173, or reuses them if they're already running (e.g. from `make dev`). Each run registers a new user with a random email, so the tests can run against a database that already has data. `make setup` installs the Chromium that Playwright drives (or run `npx playwright install chromium`). CI runs the same tests in the **E2E** job.

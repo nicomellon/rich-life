@@ -71,4 +71,5 @@ To change the port or credentials, edit `.env`. If you change the user or databa
 |---|---|
 | `make dev` | Start the database, apply the migrations, and run the API and the web app |
 | `make test` | Run all tests |
+| `make e2e` | Run the end-to-end tests in Chromium (starts the database, the API and the web app if they aren't running) |
 | `make lint` | Run all linters and formatting checks |

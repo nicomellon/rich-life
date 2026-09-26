@@ -2,7 +2,7 @@ import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import type { ProxyOptions } from 'vite'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 // The app calls the API on its own origin (/api/v1/...), so the bundle carries no configuration.
 // Here the dev and preview servers pass /api through to the backend; in production the web server
@@ -27,5 +27,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // Playwright runs the end-to-end tests in e2e/ (`make e2e`).
+    exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 })

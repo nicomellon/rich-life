@@ -1,5 +1,7 @@
 dist
 coverage
+test-results
+playwright-report
 package-lock.json
 # Markdown follows the repository-wide style rather than Prettier's.
 *.md
