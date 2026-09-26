@@ -1,7 +1,8 @@
 import datetime as dt
 from collections.abc import Sequence
+from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.entry import Entry
@@ -33,6 +34,19 @@ def list_entries(
     if bucket is not None:
         query = query.where(Entry.bucket == bucket)
     return db.scalars(query.order_by(Entry.date.desc(), Entry.id.desc())).all()
+
+
+def sum_amounts_by_bucket(
+    db: Session, user: User, month: Month
+) -> dict[Bucket, Decimal]:
+    """The total amount of the month's entries in each bucket. Buckets without entries
+    are left out."""
+    bucket_totals = db.execute(
+        select(Entry.bucket, func.sum(Entry.amount))
+        .where(Entry.user_id == user.id, Entry.month_id == month.id)
+        .group_by(Entry.bucket)
+    ).tuples()
+    return dict(bucket_totals.all())
 
 
 def find_entry(db: Session, user: User, entry_id: int) -> Entry | None:

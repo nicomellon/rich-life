@@ -3,7 +3,8 @@ from fastapi import APIRouter, HTTPException, Response, status
 from app.api.deps import CurrentUser, DbSession, RequestedMonth
 from app.schemas.month import MonthCreate, MonthRead, MonthUpdate
 from app.schemas.spending_plan import SpendingPlanPercentages
-from app.services import months
+from app.schemas.summary import MonthSummary
+from app.services import entries, months, summary
 
 router = APIRouter(prefix="/months", tags=["months"])
 
@@ -72,6 +73,24 @@ def update_month_targets(
     requested_month.guilt_free_pct = new_targets.guilt_free_pct
     db.commit()
     return MonthRead.model_validate(requested_month)
+
+
+@router.get(
+    "/{year}/{month}/summary",
+    summary="Summarize a month",
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Month not found"}},
+)
+def read_month_summary(
+    requested_month: RequestedMonth, user: CurrentUser, db: DbSession
+) -> MonthSummary:
+    """Each bucket's target next to what its entries add up to, and the totals.
+    Amounts and percentages are rounded to 2 decimal places; `actual_pct` is 0 when
+    the income is 0."""
+    return summary.summarize_month(
+        requested_month.income,
+        SpendingPlanPercentages.model_validate(requested_month),
+        entries.sum_amounts_by_bucket(db, user, requested_month),
+    )
 
 
 @router.delete(
