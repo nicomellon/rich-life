@@ -8,10 +8,10 @@ import {
   toMonthKey,
   type CalendarMonth,
 } from '@/months/calendar-month'
-import { MonthIncome } from '@/months/month-income'
 import { MonthPicker } from '@/months/month-picker'
 import { fetchMonths, monthsQueryKey } from '@/months/months-api'
 import { StartMonthForm } from '@/months/start-month-form'
+import { MonthPlanVsActual } from '@/summary/month-plan-vs-actual'
 
 export function DashboardPage() {
   // The month shown is in the URL (`?month=2026-09`), so it survives a reload and can be shared.
@@ -56,7 +56,7 @@ export function DashboardPage() {
       {monthsQuery.data &&
         (selectedStartedMonth ? (
           <div key={toMonthKey(selectedMonth)} className="space-y-6">
-            <MonthIncome month={selectedStartedMonth} />
+            <MonthPlanVsActual month={selectedStartedMonth} />
             <MonthEntries calendarMonth={selectedMonth} />
           </div>
         ) : (

@@ -21,6 +21,7 @@ export function MonthEntries({ calendarMonth }: MonthEntriesProps) {
     queryKey: monthEntriesQueryKey(calendarMonth),
     queryFn: () => fetchMonthEntries(calendarMonth),
   })
+  // The dashboard's plan vs actual reports when the summary fails to load.
   const summaryQuery = useQuery({
     queryKey: monthSummaryQueryKey(calendarMonth),
     queryFn: () => fetchMonthSummary(calendarMonth),
@@ -40,16 +41,6 @@ export function MonthEntries({ calendarMonth }: MonthEntriesProps) {
       {entriesQuery.isLoadingError && (
         <p role="alert" className="text-sm text-destructive">
           We couldn't load this month's entries. Please reload the page.
-        </p>
-      )}
-      {summaryQuery.isLoadingError && (
-        <p role="alert" className="text-sm text-destructive">
-          We couldn't load this month's totals. Please reload the page.
-        </p>
-      )}
-      {summaryQuery.isRefetchError && (
-        <p role="alert" className="text-sm text-destructive">
-          We couldn't update this month's totals. Please reload the page.
         </p>
       )}
       {entriesQuery.data &&

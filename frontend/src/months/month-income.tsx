@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Pencil } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent } from 'react'
 import { useCurrentUser } from '@/auth/auth-context'
 import { Button } from '@/components/ui/button'
 import { formatMoney, parseAmountInCents, toApiAmount } from '@/lib/money'
@@ -16,6 +16,7 @@ interface MonthIncomeProps {
 export function MonthIncome({ month }: MonthIncomeProps) {
   const queryClient = useQueryClient()
   const { data: currentUser } = useCurrentUser()
+  const labelId = useId()
   const [isEditing, setIsEditing] = useState(false)
   // The saved "3000.00" shows as "3000".
   const savedTypedIncome = String(Number(month.income))
@@ -46,17 +47,21 @@ export function MonthIncome({ month }: MonthIncomeProps) {
   if (!isEditing) {
     const savedIncomeInCents = parseAmountInCents(month.income)
     return (
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-muted-foreground">Income</span>
-        <span className="text-lg font-semibold tabular-nums">
-          {currentUser && savedIncomeInCents !== null
-            ? formatMoney(savedIncomeInCents, currentUser.currency)
-            : month.income}
-        </span>
-        <Button variant="ghost" size="sm" onClick={startEditing}>
-          <Pencil />
-          Edit income
-        </Button>
+      <div role="group" aria-labelledby={labelId} className="space-y-1">
+        <p id={labelId} className="text-sm text-muted-foreground">
+          Income
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-lg font-semibold tabular-nums">
+            {currentUser && savedIncomeInCents !== null
+              ? formatMoney(savedIncomeInCents, currentUser.currency)
+              : month.income}
+          </p>
+          <Button variant="ghost" size="sm" onClick={startEditing}>
+            <Pencil />
+            Edit income
+          </Button>
+        </div>
       </div>
     )
   }
