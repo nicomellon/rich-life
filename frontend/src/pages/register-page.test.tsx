@@ -53,6 +53,7 @@ function mockRegistrationApi(registerChallengeResponder = () => jsonResponse(reg
     'POST /auth/register-challenge': registerChallengeResponder,
     'POST /auth/verify-registration': () => jsonResponse(issuedAccessToken, 201),
     'GET /auth/me': () => jsonResponse(signedInUser),
+    'GET /months': () => jsonResponse([]),
   })
 }
 

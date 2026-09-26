@@ -16,6 +16,7 @@ describe('AppShell', () => {
     mockApi({
       'GET /auth/me': () => jsonResponse(signedInUser),
       'GET /spending-plan': () => jsonResponse(defaultSpendingPlan),
+      'GET /months': () => jsonResponse([]),
     })
   })
 

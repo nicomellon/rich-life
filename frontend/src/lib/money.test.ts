@@ -1,4 +1,4 @@
-import { formatMoney, parseAmountInCents } from '@/lib/money'
+import { formatMoney, parseAmountInCents, toApiAmount } from '@/lib/money'
 
 describe('parseAmountInCents', () => {
   it.each([
@@ -22,5 +22,16 @@ describe('parseAmountInCents', () => {
 describe('formatMoney', () => {
   it('formats cents in the given currency', () => {
     expect(formatMoney(150000, 'EUR')).toBe('€1,500.00')
+  })
+})
+
+describe('toApiAmount', () => {
+  it.each([
+    [300050, '3000.50'],
+    [300000, '3000.00'],
+    [5, '0.05'],
+    [0, '0.00'],
+  ])('writes %i cents as "%s"', (cents, expectedApiAmount) => {
+    expect(toApiAmount(cents)).toBe(expectedApiAmount)
   })
 })
