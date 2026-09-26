@@ -4,7 +4,7 @@ import { setAccessToken } from '@/lib/auth-token'
 import type { Month } from '@/months/months-api'
 import { BUCKETS, type Bucket } from '@/spending-plan/buckets'
 import { percentageField, type SpendingPlanPercentages } from '@/spending-plan/spending-plan-api'
-import type { BucketSummary, MonthSummary } from '@/summary/summary-api'
+import type { BucketStatus, BucketSummary, MonthSummary } from '@/summary/summary-api'
 
 /** Builds the response to one request; a fresh one each time, since a body can be read once. */
 export type ApiResponder = () => Response | Promise<Response>
@@ -114,6 +114,14 @@ export const groceriesEntry: Entry = {
   created_at: '2026-09-12T18:00:00Z',
 }
 
+/** The backend's status: on track within 5% of the target amount either way. */
+function bucketStatus(targetAmount: number, actualAmount: number): BucketStatus {
+  const tolerance = targetAmount * 0.05
+  if (actualAmount > targetAmount + tolerance) return 'over'
+  if (actualAmount < targetAmount - tolerance) return 'under'
+  return 'on_track'
+}
+
 /**
  * The summary of a month on the default plan, whose entries add up to `actualAmountsByBucket`
  * (0 for the buckets left out).
@@ -133,7 +141,7 @@ export function summaryOfStartedMonth(
       actual_amount: actualAmount.toFixed(2),
       actual_pct: ((actualAmount / Number(income)) * 100).toFixed(2),
       remaining: (targetAmount - actualAmount).toFixed(2),
-      status: actualAmount > targetAmount ? 'over' : 'under',
+      status: bucketStatus(targetAmount, actualAmount),
     }
   })
   const totalActual = bucketSummaries.reduce(

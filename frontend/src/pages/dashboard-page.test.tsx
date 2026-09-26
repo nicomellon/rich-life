@@ -55,6 +55,11 @@ async function editIncome(typedIncome: string) {
   await typeIncome(typedIncome)
 }
 
+/** The month's saved income, once it's shown rather than being edited. */
+function shownIncome(): Promise<HTMLElement> {
+  return screen.findByRole('group', { name: 'Income' })
+}
+
 function monthDropdown(): HTMLSelectElement {
   return screen.getByRole('combobox', { name: 'Month' })
 }
@@ -113,7 +118,7 @@ describe('DashboardPage', () => {
 
     await startMonthWithIncome('3000')
 
-    expect(await screen.findByText('€3,000.00')).toBeInTheDocument()
+    expect(await shownIncome()).toHaveTextContent('€3,000.00')
   })
 
   it("can't start the month before an income is typed", async () => {
@@ -167,7 +172,7 @@ describe('DashboardPage', () => {
 
     await startMonthWithIncome('3000')
 
-    expect(await screen.findByText('€3,000.00')).toBeInTheDocument()
+    expect(await shownIncome()).toHaveTextContent('€3,000.00')
   })
 
   it('does not report a failure when the month was already started elsewhere', async () => {
@@ -196,12 +201,12 @@ describe('DashboardPage', () => {
     })
     const queryClient = createTestQueryClient()
     renderApp('/', queryClient)
-    await screen.findByText('€3,000.00')
+    await shownIncome()
 
     await act(() => queryClient.invalidateQueries({ queryKey: monthsQueryKey }))
 
     await waitFor(() => expect(queryClient.getQueryState(monthsQueryKey)?.status).toBe('error'))
-    expect(await screen.findByText('€3,000.00')).toBeInTheDocument()
+    expect(await shownIncome()).toHaveTextContent('€3,000.00')
   })
 
   it('explains that the months could not be loaded', async () => {
@@ -219,7 +224,7 @@ describe('DashboardPage', () => {
 
     renderApp('/?month=2026-07')
 
-    expect(await screen.findByText('€2,800.00')).toBeInTheDocument()
+    expect(await shownIncome()).toHaveTextContent('€2,800.00')
   })
 
   it('shows the current month when the URL names an invalid month', async () => {
@@ -266,11 +271,11 @@ describe('DashboardPage', () => {
   it('switches to the month chosen in the dropdown', async () => {
     mockStartedMonthsApi()
     renderApp('/')
-    await screen.findByText('€3,000.00')
+    await shownIncome()
 
     await userEvent.selectOptions(monthDropdown(), 'July 2026')
 
-    expect(screen.getByText('€2,800.00')).toBeInTheDocument()
+    expect(await shownIncome()).toHaveTextContent('€2,800.00')
   })
 
   it('starts editing the income with the saved amount', async () => {
@@ -289,7 +294,7 @@ describe('DashboardPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Save income' }))
 
-    await screen.findByText('€3,500.50')
+    await shownIncome()
     expect(sentJsonBody(fetchMock, 'PATCH /months/2026/9')).toEqual({ income: '3500.50' })
   })
 
@@ -300,7 +305,7 @@ describe('DashboardPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Save income' }))
 
-    expect(await screen.findByText('€3,500.50')).toBeInTheDocument()
+    expect(await shownIncome()).toHaveTextContent('€3,500.50')
   })
 
   it("can't save an income that is not an amount", async () => {
@@ -319,7 +324,7 @@ describe('DashboardPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
-    expect(screen.getByText('€3,000.00')).toBeInTheDocument()
+    expect(await shownIncome()).toHaveTextContent('€3,000.00')
   })
 
   it("can't cancel editing while the income is being saved", async () => {

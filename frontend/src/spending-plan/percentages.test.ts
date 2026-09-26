@@ -1,4 +1,5 @@
 import {
+  formatApiPercentage,
   formatPercentage,
   parsePercentage,
   shareInCents,
@@ -45,6 +46,16 @@ describe('toApiPercentage', () => {
 describe('formatPercentage', () => {
   it('shows basis points as a percentage', () => {
     expect(formatPercentage(1250)).toBe('12.5%')
+  })
+})
+
+describe('formatApiPercentage', () => {
+  it.each([
+    ['a whole percentage', '50.00', '50%'],
+    ['a fraction of a percent', '33.33', '33.33%'],
+    ['more than 100', '120.50', '120.5%'],
+  ])('shows %s from the API as a percentage', (_, apiPercentage, expectedDisplay) => {
+    expect(formatApiPercentage(apiPercentage)).toBe(expectedDisplay)
   })
 })
 

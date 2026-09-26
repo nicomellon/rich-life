@@ -1,4 +1,10 @@
-import { formatApiAmount, formatMoney, parseAmountInCents, toApiAmount } from '@/lib/money'
+import {
+  formatApiAmount,
+  formatCompactMoney,
+  formatMoney,
+  parseAmountInCents,
+  toApiAmount,
+} from '@/lib/money'
 
 describe('parseAmountInCents', () => {
   it.each([
@@ -42,5 +48,11 @@ describe('formatApiAmount', () => {
     ['a negative amount', '-50.00', '-€50.00'],
   ])('formats %s from the API in the given currency', (_, apiAmount, expectedDisplay) => {
     expect(formatApiAmount(apiAmount, 'EUR')).toBe(expectedDisplay)
+  })
+})
+
+describe('formatCompactMoney', () => {
+  it('shortens an amount in the given currency', () => {
+    expect(formatCompactMoney(1500, 'EUR')).toBe('€1.5K')
   })
 })

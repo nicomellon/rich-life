@@ -24,6 +24,11 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+  /* How a bucket's actual amount compares with its target, and the target bars in charts. */
+  --status-under: oklch(0.546 0.215 262.881);
+  --status-on-track: oklch(0.527 0.154 150.069);
+  --status-over: oklch(0.577 0.245 27.325);
+  --chart-target: oklch(0.87 0 0);
 }
 
 .dark {
@@ -45,6 +50,10 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+  --status-under: oklch(0.707 0.165 254.624);
+  --status-on-track: oklch(0.723 0.219 149.579);
+  --status-over: oklch(0.704 0.191 22.216);
+  --chart-target: oklch(0.439 0 0);
 }
 
 @theme inline {
@@ -70,6 +79,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-status-under: var(--status-under);
+  --color-status-on-track: var(--status-on-track);
+  --color-status-over: var(--status-over);
+  --color-chart-target: var(--chart-target);
 }
 
 @layer base {

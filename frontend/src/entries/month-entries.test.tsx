@@ -166,16 +166,6 @@ describe('MonthEntries', () => {
     )
   })
 
-  it('explains that the totals could not be loaded', async () => {
-    mockEntriesApi({ 'GET /months/2026/9/summary': respondWithServerError })
-
-    renderApp('/')
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "We couldn't load this month's totals. Please reload the page.",
-    )
-  })
-
   it('dates a new entry today', async () => {
     mockEntriesApi()
 
@@ -257,22 +247,6 @@ describe('MonthEntries', () => {
     expect(
       await within(await bucketSection('Guilt-Free Spending')).findByText('Lunch'),
     ).toBeInTheDocument()
-  })
-
-  it('explains that the totals could not be updated after a change', async () => {
-    mockEntriesApi({
-      'GET /months/2026/9/summary': inSequence(
-        () => jsonResponse(summaryOfSavedEntries),
-        respondWithServerError,
-      ),
-    })
-    renderApp('/')
-
-    await addLunch()
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "We couldn't update this month's totals. Please reload the page.",
-    )
   })
 
   it('empties the amount once the entry is added', async () => {

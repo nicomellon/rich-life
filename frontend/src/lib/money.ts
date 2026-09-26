@@ -26,3 +26,12 @@ export function toApiAmount(cents: number): string {
 export function formatApiAmount(apiAmount: string, currency: string): string {
   return formatMoney(Math.round(Number(apiAmount) * 100), currency)
 }
+
+/** A rounded, short amount in `currency` for a chart axis, e.g. 1500 in EUR as "€1.5K". */
+export function formatCompactMoney(amount: number, currency: string): string {
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency,
+    notation: 'compact',
+  }).format(amount)
+}

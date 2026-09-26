@@ -31,6 +31,11 @@ export function formatPercentage(basisPoints: number): string {
   return percentageFormat.format(basisPoints / FULL_PLAN_BASIS_POINTS)
 }
 
+/** A percentage as the API writes it for display, e.g. "12.50" as "12.5%". */
+export function formatApiPercentage(apiPercentage: string): string {
+  return formatPercentage(Math.round(Number(apiPercentage) * 100))
+}
+
 /** The part of `cents` that `basisPoints` stands for, rounded to the nearest cent. */
 export function shareInCents(cents: number, basisPoints: number): number {
   return Math.round((cents * basisPoints) / FULL_PLAN_BASIS_POINTS)
