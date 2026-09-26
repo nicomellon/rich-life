@@ -1,31 +1,11 @@
-from datetime import MAXYEAR, MINYEAR
-from typing import Annotated
+from fastapi import APIRouter, HTTPException, Response, status
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
-
-from app.api.deps import CurrentUser, DbSession
-from app.models.month import Month
+from app.api.deps import CurrentUser, DbSession, RequestedMonth
 from app.schemas.month import MonthCreate, MonthRead, MonthUpdate
 from app.schemas.spending_plan import SpendingPlanPercentages
 from app.services import months
 
 router = APIRouter(prefix="/months", tags=["months"])
-
-
-def get_requested_month(
-    year: Annotated[int, Path(ge=MINYEAR, le=MAXYEAR)],
-    month: Annotated[int, Path(ge=1, le=12)],
-    user: CurrentUser,
-    db: DbSession,
-) -> Month:
-    """The signed-in user's month from the path. Responds 404 if they don't have it."""
-    requested_month = months.find_month(db, user, year, month)
-    if requested_month is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Month not found")
-    return requested_month
-
-
-RequestedMonth = Annotated[Month, Depends(get_requested_month)]
 
 
 @router.get("", summary="List the months")

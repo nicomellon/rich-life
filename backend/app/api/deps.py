@@ -1,12 +1,16 @@
+from datetime import MAXYEAR, MINYEAR
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Path, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.db.session import get_db
+from app.models.entry import Entry
+from app.models.month import Month
 from app.models.user import User
+from app.services import entries, months
 
 # Shared dependencies for route handlers, e.g. `def list_months(db: DbSession) -> ...`.
 DbSession = Annotated[Session, Depends(get_db)]
@@ -39,3 +43,37 @@ def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def get_requested_month(
+    year: Annotated[int, Path(ge=MINYEAR, le=MAXYEAR)],
+    month: Annotated[int, Path(ge=1, le=12)],
+    user: CurrentUser,
+    db: DbSession,
+) -> Month:
+    """The signed-in user's month from the path. Responds 404 if they don't have it."""
+    requested_month = months.find_month(db, user, year, month)
+    if requested_month is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Month not found")
+    return requested_month
+
+
+RequestedMonth = Annotated[Month, Depends(get_requested_month)]
+
+# The largest id a Postgres INTEGER column holds: a larger one would fail the query
+# instead of finding nothing.
+MAX_ID = 2**31 - 1
+
+
+def get_requested_entry(
+    entry_id: Annotated[int, Path(ge=1, le=MAX_ID)], user: CurrentUser, db: DbSession
+) -> Entry:
+    """The signed-in user's entry from the path. Responds 404 if they don't have it,
+    including when it belongs to another user."""
+    requested_entry = entries.find_entry(db, user, entry_id)
+    if requested_entry is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Entry not found")
+    return requested_entry
+
+
+RequestedEntry = Annotated[Entry, Depends(get_requested_entry)]
