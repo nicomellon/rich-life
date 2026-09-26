@@ -15,9 +15,9 @@ from app.models.user import User
 from app.schemas.entry import EntryCreate, EntryRead, EntryUpdate
 from app.schemas.month import MonthRead
 from tests.accounts import EMAIL
-from tests.months import OCTOBER, SEPTEMBER_PATH, create_month, send_json
+from tests.entries import SEPTEMBER_ENTRIES_PATH, create_entry, post_entry
+from tests.months import OCTOBER, SEPTEMBER_PATH, create_month
 
-SEPTEMBER_ENTRIES_PATH = f"{SEPTEMBER_PATH}/entries"
 # The first day after September, which entries in September can't have.
 OCTOBER_FIRST = dt.date(2026, 10, 1)
 RENT = EntryCreate(
@@ -51,28 +51,6 @@ class ValidationErrorBody(BaseModel):
 
 def entry_path(entry: EntryRead) -> str:
     return f"/api/v1/entries/{entry.id}"
-
-
-def post_entry(
-    client: TestClient,
-    headers: dict[str, str],
-    new_entry: EntryCreate,
-    path: str = SEPTEMBER_ENTRIES_PATH,
-) -> Response:
-    return send_json(client, "POST", path, headers, new_entry)
-
-
-def create_entry(
-    client: TestClient,
-    headers: dict[str, str],
-    new_entry: EntryCreate = RENT,
-    path: str = SEPTEMBER_ENTRIES_PATH,
-) -> EntryRead:
-    """Add the entry to the month at `path` (September by default), failing the test
-    unless the API accepts it."""
-    response = post_entry(client, headers, new_entry, path)
-    assert response.status_code == 201, response.text
-    return EntryRead.model_validate(response.json())
 
 
 def patch_entry(
