@@ -14,6 +14,7 @@ setup: .env ## Install git hooks and dependencies, and create .env from .env.exa
 	pre-commit install
 	$(BACKEND) uv sync
 	$(FRONTEND) npm ci
+	$(FRONTEND) npx playwright install chromium
 
 .env:
 	cp .env.example .env
@@ -70,6 +71,10 @@ test: ## Run all tests
 	python3 -m unittest discover -s scripts/tests
 	$(BACKEND) uv run pytest
 	$(FRONTEND) npm test
+
+.PHONY: e2e
+e2e: db migrate ## Run the end-to-end tests in Chromium, starting the API and web app if needed
+	$(FRONTEND) node --env-file=../.env node_modules/@playwright/test/cli.js test
 
 .PHONY: lint
 lint: ## Run all linters, formatting and type checks
