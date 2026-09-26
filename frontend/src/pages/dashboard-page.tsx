@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router'
+import { MonthEntries } from '@/entries/month-entries'
 import {
   currentCalendarMonth,
   isSameMonth,
@@ -54,7 +55,10 @@ export function DashboardPage() {
           months already loaded, so the forms stay. */}
       {monthsQuery.data &&
         (selectedStartedMonth ? (
-          <MonthIncome key={toMonthKey(selectedMonth)} month={selectedStartedMonth} />
+          <div key={toMonthKey(selectedMonth)} className="space-y-6">
+            <MonthIncome month={selectedStartedMonth} />
+            <MonthEntries calendarMonth={selectedMonth} />
+          </div>
         ) : (
           <StartMonthForm key={toMonthKey(selectedMonth)} calendarMonth={selectedMonth} />
         ))}

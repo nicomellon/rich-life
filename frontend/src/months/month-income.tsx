@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { formatMoney, parseAmountInCents, toApiAmount } from '@/lib/money'
 import { IncomeField } from '@/months/income-field'
 import { storeSavedMonth, updateMonthIncome, type Month } from '@/months/months-api'
+import { monthSummaryQueryKey } from '@/summary/summary-api'
 
 interface MonthIncomeProps {
   month: Month
@@ -24,6 +25,8 @@ export function MonthIncome({ month }: MonthIncomeProps) {
     mutationFn: (newIncome: string) => updateMonthIncome(month, newIncome),
     onSuccess: async (updatedMonth) => {
       await storeSavedMonth(queryClient, updatedMonth)
+      // The bucket targets are shares of the income.
+      void queryClient.invalidateQueries({ queryKey: monthSummaryQueryKey(month) })
       setIsEditing(false)
     },
   })

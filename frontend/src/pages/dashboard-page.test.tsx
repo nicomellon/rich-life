@@ -3,12 +3,14 @@ import userEvent from '@testing-library/user-event'
 import { monthsQueryKey, type Month } from '@/months/months-api'
 import {
   type ApiResponder,
+  inSequence,
   jsonResponse,
   mockApi,
   sentJsonBody,
   signedInUser,
   signInBeforeRender,
   startedSeptember2026,
+  summaryOfStartedMonth,
 } from '@/test/api-mock'
 import { createTestQueryClient, renderApp } from '@/test/render-app'
 
@@ -21,6 +23,8 @@ function mockMonthsApi(extraResponders: Record<string, ApiResponder> = {}) {
     'GET /auth/me': () => jsonResponse(signedInUser),
     'GET /months': () => jsonResponse([]),
     'POST /months': () => jsonResponse(startedSeptember2026, 201),
+    'GET /months/2026/9/entries': () => jsonResponse([]),
+    'GET /months/2026/9/summary': () => jsonResponse(summaryOfStartedMonth({})),
     ...extraResponders,
   })
 }
@@ -29,18 +33,10 @@ function mockStartedMonthsApi(extraResponders: Record<string, ApiResponder> = {}
   return mockMonthsApi({
     'GET /months': () => jsonResponse([startedSeptember2026, startedJuly2026]),
     'PATCH /months/2026/9': () => jsonResponse(updatedSeptember2026),
+    'GET /months/2026/7/entries': () => jsonResponse([]),
+    'GET /months/2026/7/summary': () => jsonResponse(summaryOfStartedMonth({}, '2800.00')),
     ...extraResponders,
   })
-}
-
-/** Answers each request with the next responder, repeating the last one. */
-function inSequence(...responders: ApiResponder[]): ApiResponder {
-  let requestCount = 0
-  return () => {
-    const respond = responders[Math.min(requestCount, responders.length - 1)]!
-    requestCount += 1
-    return respond()
-  }
 }
 
 async function typeIncome(typedIncome: string) {
