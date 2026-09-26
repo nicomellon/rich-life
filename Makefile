@@ -39,6 +39,11 @@ migration: .env ## Autogenerate a migration from model changes, e.g. make migrat
 	@test -n "$(m)" || { echo 'Usage: make migration m="describe the change"'; exit 1; }
 	$(BACKEND) uv run --env-file ../.env alembic revision --autogenerate -m "$(m)"
 
+.PHONY: seed
+seed: .env ## Add 3 months of example data to an account, e.g. make seed email=you@example.com
+	@test -n "$(email)" || { echo 'Usage: make seed email=you@example.com'; exit 1; }
+	$(BACKEND) uv run --env-file ../.env python -m app.scripts.seed --email "$(email)"
+
 .PHONY: db
 db: ## Start Postgres in the background and wait until it's ready
 	$(COMPOSE) up -d --wait db

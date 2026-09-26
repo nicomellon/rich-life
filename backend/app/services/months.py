@@ -32,10 +32,16 @@ def find_month(db: Session, user: User, year: int, month: int) -> Month | None:
     ).one_or_none()
 
 
-def create_month(db: Session, user: User, new_month: MonthCreate) -> Month:
+def create_month(
+    db: Session, user: User, new_month: MonthCreate, *, commit: bool = True
+) -> Month:
     """Create the month with the targets of the user's current spending plan. Raises
-    `MonthAlreadyExistsError` if the user already has it."""
-    plan_targets = SpendingPlanPercentages.model_validate(get_or_create_plan(db, user))
+    `MonthAlreadyExistsError` if the user already has it. With `commit=False` the
+    month is left in the open transaction, for the caller to commit along with more
+    changes."""
+    plan_targets = SpendingPlanPercentages.model_validate(
+        get_or_create_plan(db, user, commit=commit)
+    )
     # DO NOTHING turns a duplicate, even one created by a concurrent request, into no
     # row returned instead of an error that would abort the transaction.
     created_month = db.scalars(
@@ -46,5 +52,6 @@ def create_month(db: Session, user: User, new_month: MonthCreate) -> Month:
     ).one_or_none()
     if created_month is None:
         raise MonthAlreadyExistsError
-    db.commit()
+    if commit:
+        db.commit()
     return created_month

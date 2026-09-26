@@ -584,7 +584,7 @@ def test_delete_month_deletes_its_entries(
 ) -> None:
     client.delete(SEPTEMBER_PATH, headers=signed_in_headers)
 
-    assert db.scalars(select(Entry)).all() == []
+    assert db.scalars(select(Entry).join(User).where(User.email == EMAIL)).all() == []
 
 
 def test_deleting_a_user_deletes_their_entries(db: Session, rent: EntryRead) -> None:
@@ -593,7 +593,7 @@ def test_deleting_a_user_deletes_their_entries(db: Session, rent: EntryRead) -> 
     db.delete(user)
     db.flush()
 
-    assert db.scalars(select(Entry)).all() == []
+    assert db.scalars(select(Entry).where(Entry.user_id == user.id)).all() == []
 
 
 # Database constraints

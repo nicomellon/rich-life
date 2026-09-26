@@ -56,14 +56,23 @@ def find_entry(db: Session, user: User, entry_id: int) -> Entry | None:
 
 
 def create_entry(
-    db: Session, user: User, month: Month, new_entry: EntryCreate
+    db: Session,
+    user: User,
+    month: Month,
+    new_entry: EntryCreate,
+    *,
+    commit: bool = True,
 ) -> Entry:
     """Add the entry to the month. Raises `DateOutsideMonthError` if its date falls
-    outside the month."""
+    outside the month. With `commit=False` the entry is only flushed, for the caller
+    to commit along with more changes."""
     _check_date_is_within(month, new_entry.date)
     created_entry = Entry(user_id=user.id, month_id=month.id, **new_entry.model_dump())
     db.add(created_entry)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     # Read the saved row back, so the amount has the database's two decimal places.
     db.refresh(created_entry)
     return created_entry

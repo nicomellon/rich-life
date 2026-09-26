@@ -534,7 +534,7 @@ def test_delete_month_lets_the_month_be_created_again(
 def test_database_rejects_month_targets_whose_total_is_not_100(
     db: Session, september: MonthRead
 ) -> None:
-    saved_month = db.scalars(select(Month)).one()
+    saved_month = db.scalars(select(Month).join(User).where(User.email == EMAIL)).one()
     saved_month.savings_pct = Decimal(25)
 
     with pytest.raises(IntegrityError, match="ck_months_total_pct"):
@@ -542,7 +542,7 @@ def test_database_rejects_month_targets_whose_total_is_not_100(
 
 
 def test_database_rejects_a_duplicate_month(db: Session, september: MonthRead) -> None:
-    saved_month = db.scalars(select(Month)).one()
+    saved_month = db.scalars(select(Month).join(User).where(User.email == EMAIL)).one()
     db.add(
         Month(
             user_id=saved_month.user_id,
@@ -565,4 +565,4 @@ def test_deleting_a_user_deletes_their_months(
     db.delete(user)
     db.flush()
 
-    assert db.scalars(select(Month)).all() == []
+    assert db.scalars(select(Month).where(Month.user_id == user.id)).all() == []

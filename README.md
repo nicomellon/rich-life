@@ -49,6 +49,7 @@ postgresql://richlife:richlife@localhost:5432/richlife
 | `make db` | Start Postgres (same as `docker compose up -d db`) |
 | `make migrate` | Apply the migrations (`alembic upgrade head`) |
 | `make migration m="..."` | Autogenerate a migration from model changes |
+| `make seed email=...` | Add 3 months of example data to an account you registered in the app |
 | `make db-shell` | Open `psql` in the database |
 | `make db-stop` | Stop the containers, keeping the data |
 | `make db-reset` | Delete all data and start a fresh database |

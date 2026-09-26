@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.models.spending_plan import SpendingPlan
 from app.models.user import User
 from app.schemas.spending_plan import SpendingPlanPercentages
+from app.services.spending_plans import get_or_create_plan
 from tests.accounts import EMAIL, OTHER_EMAIL, auth_header, register
 from tests.authenticator import SoftwareAuthenticator
 from tests.spending_plans import (
@@ -86,6 +87,22 @@ def headers_of_a_user_without_a_plan(
     """A signed-in user whose plan row is missing, e.g. deleted by hand."""
     db.execute(delete(SpendingPlan))
     return signed_in_headers
+
+
+def test_get_or_create_plan_without_commit_leaves_a_created_plan_uncommitted(
+    db: Session, signed_in_headers: dict[str, str]
+) -> None:
+    user = db.scalars(select(User).where(User.email == EMAIL)).one()
+    db.execute(delete(SpendingPlan).where(SpendingPlan.user_id == user.id))
+    db.commit()
+
+    get_or_create_plan(db, user, commit=False)
+
+    db.rollback()
+    assert (
+        db.scalars(select(SpendingPlan).where(SpendingPlan.user_id == user.id)).all()
+        == []
+    )
 
 
 def test_get_spending_plan_without_a_saved_plan_returns_the_default_plan(
