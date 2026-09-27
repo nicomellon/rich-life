@@ -33,6 +33,18 @@ export function internalErrorResponse(): Response {
   return errorResponse(500, 'internal_error', 'Something went wrong. Please try again.')
 }
 
+/** A server error with a message of the backend's own, unlike the app's generic one. */
+export const DATABASE_UNAVAILABLE_MESSAGE = 'The database is unavailable. Please try again later.'
+
+export function databaseUnavailableResponse(): Response {
+  return errorResponse(500, 'internal_error', DATABASE_UNAVAILABLE_MESSAGE)
+}
+
+/** Fails like `fetch` does when the server can't be reached. */
+export function networkFailure(): Promise<Response> {
+  return Promise.reject(new TypeError('Failed to fetch'))
+}
+
 /** Answers each request with the next responder, repeating the last one. */
 export function inSequence(...responders: ApiResponder[]): ApiResponder {
   let requestCount = 0
