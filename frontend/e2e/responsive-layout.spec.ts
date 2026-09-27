@@ -145,11 +145,11 @@ test.describe('signed-in pages', () => {
   })
 
   test("header at phone width hides the user's email", async () => {
-    await expect(signedInPage.getByText(registeredEmail)).toBeHidden()
+    await expect(signedInPage.getByRole('banner').getByText(registeredEmail)).toBeHidden()
   })
 
   test("header at phone width hides the sign-out button's text", async () => {
-    const signOutButton = signedInPage.getByRole('button', { name: 'Sign out' })
+    const signOutButton = signedInPage.getByRole('banner').getByRole('button', { name: 'Sign out' })
 
     await expect(signOutButton.getByText('Sign out')).toBeHidden()
   })
@@ -165,12 +165,12 @@ test.describe('signed-in pages', () => {
   test("header at laptop width shows the user's email", async () => {
     await signedInPage.setViewportSize(LAPTOP_VIEWPORT)
 
-    await expect(signedInPage.getByText(registeredEmail)).toBeVisible()
+    await expect(signedInPage.getByRole('banner').getByText(registeredEmail)).toBeVisible()
   })
 
   test("header at laptop width shows the sign-out button's text", async () => {
     await signedInPage.setViewportSize(LAPTOP_VIEWPORT)
-    const signOutButton = signedInPage.getByRole('button', { name: 'Sign out' })
+    const signOutButton = signedInPage.getByRole('banner').getByRole('button', { name: 'Sign out' })
 
     await expect(signOutButton.getByText('Sign out')).toBeVisible()
   })
