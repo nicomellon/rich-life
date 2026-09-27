@@ -5,19 +5,49 @@ describe('passkeyErrorMessage', () => {
   it.each([
     [
       'a registered email',
-      new ApiError(409, 'Email already registered'),
+      new ApiError({
+        status: 409,
+        code: 'email_already_registered',
+        message: 'Email already registered',
+      }),
       'An account with this email already exists. Sign in instead.',
     ],
     [
       'a rejected passkey',
-      new ApiError(401, 'Passkey verification failed'),
+      new ApiError({
+        status: 401,
+        code: 'passkey_verification_failed',
+        message: 'Passkey verification failed',
+      }),
       "We couldn't verify your passkey. Please try again.",
     ],
-    ['an invalid email', new ApiError(422, []), 'Please enter a valid email address.'],
+    [
+      'an invalid email',
+      new ApiError({
+        status: 422,
+        code: 'validation_failed',
+        message: 'Some fields are invalid.',
+        fieldErrors: [{ field: 'email', message: 'value is not a valid email address' }],
+      }),
+      'Please enter a valid email address.',
+    ],
     [
       'a server error',
-      new ApiError(500, 'Internal Server Error'),
+      new ApiError({
+        status: 500,
+        code: 'internal_error',
+        message: 'Something went wrong. Please try again.',
+      }),
       'Something went wrong on our side. Please try again.',
+    ],
+    [
+      'an unreachable server',
+      new ApiError({
+        status: 0,
+        code: 'network_error',
+        message: "Couldn't reach the server. Check your connection and try again.",
+      }),
+      "Couldn't reach the server. Check your connection and try again.",
     ],
     [
       'a cancelled prompt',

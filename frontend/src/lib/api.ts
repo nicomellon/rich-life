@@ -1,19 +1,68 @@
+import { z } from 'zod'
 import { clearAccessToken, getAccessToken } from '@/lib/auth-token'
 
 // Same origin as the app: the dev server (vite.config.ts) or, in production, the web server
 // serving the build passes /api through to the backend.
 const API_PREFIX = '/api/v1'
 
-/** A non-2xx response from the API. `detail` is FastAPI's error payload when there is one. */
+/** One invalid value in a request, e.g. `{ field: 'amount', message: '...' }`. */
+const fieldErrorSchema = z.object({ field: z.string(), message: z.string() })
+
+export type FieldError = z.infer<typeof fieldErrorSchema>
+
+/** The backend's `ErrorCode`: what went wrong, for the app to branch on. */
+const errorCodeSchema = z.enum([
+  'not_authenticated',
+  'passkey_verification_failed',
+  'email_already_registered',
+  'month_not_found',
+  'entry_not_found',
+  'month_already_exists',
+  'validation_failed',
+  'bad_request',
+  'not_found',
+  'method_not_allowed',
+  'internal_error',
+])
+
+/** The backend's codes, plus ours for a response we can't read and for no response at all. */
+export type ApiErrorCode = z.infer<typeof errorCodeSchema> | 'unknown_error' | 'network_error'
+
+/** The body of every error response from the backend (`ErrorResponse`). */
+const errorResponseSchema = z.object({
+  detail: z.string(),
+  code: errorCodeSchema,
+  fields: z.array(fieldErrorSchema).optional(),
+})
+
+export type ErrorResponseBody = z.infer<typeof errorResponseSchema>
+
+export const UNKNOWN_ERROR_MESSAGE = 'Something went wrong. Please try again.'
+export const NETWORK_ERROR_MESSAGE =
+  "Couldn't reach the server. Check your connection and try again."
+
+interface ApiErrorFields {
+  /** The HTTP status, or 0 when the request never got a response. */
+  status: number
+  code: ApiErrorCode
+  /** The backend's `detail`: safe to show to the user as it is. */
+  message: string
+  fieldErrors?: FieldError[]
+}
+
+/** A failed API request: a non-2xx response, or no response at all. */
 export class ApiError extends Error {
   readonly status: number
-  readonly detail: unknown
+  readonly code: ApiErrorCode
+  /** The invalid values of a 422 response; empty for every other error. */
+  readonly fieldErrors: FieldError[]
 
-  constructor(status: number, detail: unknown) {
-    super(typeof detail === 'string' ? detail : `API request failed with status ${status}`)
+  constructor({ status, code, message, fieldErrors = [] }: ApiErrorFields) {
+    super(message)
     this.name = 'ApiError'
     this.status = status
-    this.detail = detail
+    this.code = code
+    this.fieldErrors = fieldErrors
   }
 }
 
@@ -35,21 +84,39 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   if (token) headers.set('Authorization', `Bearer ${token}`)
   if (body !== undefined) headers.set('Content-Type', 'application/json')
 
-  const response = await fetch(`${API_PREFIX}${path}`, {
-    ...init,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
+  // Outside the `try`, so a body that can't be serialised isn't reported as a network error.
+  const requestBody = body === undefined ? undefined : JSON.stringify(body)
+  let response: Response
+  try {
+    response = await fetch(`${API_PREFIX}${path}`, { ...init, headers, body: requestBody })
+  } catch {
+    throw new ApiError({ status: 0, code: 'network_error', message: NETWORK_ERROR_MESSAGE })
+  }
 
-  const payload = await readBody(response)
   if (!response.ok) {
     // The token has expired or its account is gone. Forgetting it signs the user out, and the
     // route guards send them to the sign-in page.
     if (response.status === 401 && token) clearAccessToken()
-    const detail = isObject(payload) && 'detail' in payload ? payload.detail : payload
-    throw new ApiError(response.status, detail)
+    throw await readApiError(response)
   }
-  return payload as T
+  return (await readBody(response)) as T
+}
+
+/**
+ * The error a non-2xx response stands for, or an `unknown_error` when its body isn't in the
+ * backend's format or has a code this app doesn't know.
+ */
+async function readApiError(response: Response): Promise<ApiError> {
+  const parsedBody = errorResponseSchema.safeParse(await readBody(response).catch(() => undefined))
+  if (!parsedBody.success) {
+    return new ApiError({
+      status: response.status,
+      code: 'unknown_error',
+      message: UNKNOWN_ERROR_MESSAGE,
+    })
+  }
+  const { detail, code, fields = [] } = parsedBody.data
+  return new ApiError({ status: response.status, code, message: detail, fieldErrors: fields })
 }
 
 async function readBody(response: Response): Promise<unknown> {
@@ -57,10 +124,6 @@ async function readBody(response: Response): Promise<unknown> {
   if (!text) return undefined
   const isJson = response.headers.get('Content-Type')?.includes('application/json')
   return isJson ? JSON.parse(text) : text
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
 }
 
 export const api = {

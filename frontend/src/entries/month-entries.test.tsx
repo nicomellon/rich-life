@@ -7,6 +7,7 @@ import {
   emptyResponse,
   groceriesEntry,
   inSequence,
+  internalErrorResponse,
   jsonResponse,
   mockApi,
   neverRespond,
@@ -32,7 +33,6 @@ const lunchEntry: Entry = {
 const changedRentEntry: Entry = { ...rentEntry, amount: '1250.00', description: 'Rent and bills' }
 const updatedSeptember2026: Month = { ...startedSeptember2026, income: '3500.00' }
 const summaryOfSavedEntries = summaryOfStartedMonth({ fixed_costs: '1200.00', guilt_free: '45.50' })
-const respondWithServerError = () => jsonResponse({ detail: 'Internal Server Error' }, 500)
 const noEntriesMessage = 'No entries yet. Add your first expense above.'
 
 function mockEntriesApi(extraResponders: Record<string, ApiResponder> = {}) {
@@ -202,7 +202,7 @@ describe('MonthEntries', () => {
   })
 
   it('removes the skeleton when the entries could not be loaded', async () => {
-    mockEntriesApi({ 'GET /months/2026/9/entries': respondWithServerError })
+    mockEntriesApi({ 'GET /months/2026/9/entries': internalErrorResponse })
     renderApp('/')
 
     await screen.findByRole('alert')
@@ -211,7 +211,7 @@ describe('MonthEntries', () => {
   })
 
   it('explains that the entries could not be loaded', async () => {
-    mockEntriesApi({ 'GET /months/2026/9/entries': respondWithServerError })
+    mockEntriesApi({ 'GET /months/2026/9/entries': internalErrorResponse })
 
     renderApp('/')
 
@@ -291,7 +291,7 @@ describe('MonthEntries', () => {
     mockEntriesApi({
       'GET /months/2026/9/entries': inSequence(
         () => jsonResponse([groceriesEntry, rentEntry]),
-        respondWithServerError,
+        internalErrorResponse,
       ),
     })
     renderApp('/')
@@ -433,7 +433,7 @@ describe('MonthEntries', () => {
   })
 
   it('explains that adding the entry failed', async () => {
-    mockEntriesApi({ 'POST /months/2026/9/entries': respondWithServerError })
+    mockEntriesApi({ 'POST /months/2026/9/entries': internalErrorResponse })
     renderApp('/')
 
     await addLunch()
@@ -523,7 +523,7 @@ describe('MonthEntries', () => {
     mockEntriesApi({
       'GET /months/2026/9/entries': inSequence(
         () => jsonResponse([groceriesEntry, rentEntry]),
-        respondWithServerError,
+        internalErrorResponse,
       ),
     })
     renderApp('/')
@@ -546,7 +546,7 @@ describe('MonthEntries', () => {
   })
 
   it('explains that saving the entry failed', async () => {
-    mockEntriesApi({ 'PATCH /entries/1': respondWithServerError })
+    mockEntriesApi({ 'PATCH /entries/1': internalErrorResponse })
     renderApp('/')
 
     await changeRent()
@@ -646,7 +646,7 @@ describe('MonthEntries', () => {
     mockEntriesApi({
       'GET /months/2026/9/entries': inSequence(
         () => jsonResponse([groceriesEntry, rentEntry]),
-        respondWithServerError,
+        internalErrorResponse,
       ),
     })
     renderApp('/')
@@ -671,7 +671,7 @@ describe('MonthEntries', () => {
   })
 
   it('explains that deleting the entry failed', async () => {
-    mockEntriesApi({ 'DELETE /entries/1': respondWithServerError })
+    mockEntriesApi({ 'DELETE /entries/1': internalErrorResponse })
     renderApp('/')
 
     await deleteRent()

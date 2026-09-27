@@ -7,6 +7,7 @@ import {
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
+  errorResponse,
   issuedAccessToken,
   jsonResponse,
   mockApi,
@@ -100,7 +101,9 @@ describe('RegisterPage', () => {
   })
 
   it('explains that the email is already registered', async () => {
-    mockRegistrationApi(() => jsonResponse({ detail: 'Email already registered' }, 409))
+    mockRegistrationApi(() =>
+      errorResponse(409, 'email_already_registered', 'Email already registered'),
+    )
     renderApp('/register')
 
     await registerAs('ada@example.com')

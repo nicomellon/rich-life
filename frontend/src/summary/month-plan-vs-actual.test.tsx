@@ -5,6 +5,7 @@ import type { Month } from '@/months/months-api'
 import {
   type ApiResponder,
   inSequence,
+  internalErrorResponse,
   jsonResponse,
   mockApi,
   neverRespond,
@@ -18,7 +19,6 @@ import { findLoadingSkeleton, unlabelledBusySkeletons } from '@/test/loading-ske
 import { renderApp } from '@/test/render-app'
 
 const summaryWithRent = summaryOfStartedMonth({ fixed_costs: '1200.00' })
-const respondWithServerError = () => jsonResponse({ detail: 'Internal Server Error' }, 500)
 const incomeHint = "Add this month's income to see your targets."
 const septemberWithoutIncome: Month = { ...startedSeptember2026, income: '0.00' }
 
@@ -343,7 +343,7 @@ describe('MonthPlanVsActual', () => {
     mockSummaryApi({
       'GET /months/2026/9/summary': inSequence(
         () => jsonResponse(summaryWithRent),
-        respondWithServerError,
+        internalErrorResponse,
       ),
     })
     renderApp('/')
@@ -382,7 +382,7 @@ describe('MonthPlanVsActual', () => {
   })
 
   it("removes the skeleton when the month's totals could not be loaded", async () => {
-    mockSummaryApi({ 'GET /months/2026/9/summary': respondWithServerError })
+    mockSummaryApi({ 'GET /months/2026/9/summary': internalErrorResponse })
     renderApp('/')
 
     await screen.findByRole('alert')
@@ -391,7 +391,7 @@ describe('MonthPlanVsActual', () => {
   })
 
   it("leaves no skeleton busy when the month's totals could not be loaded", async () => {
-    mockSummaryApi({ 'GET /months/2026/9/summary': respondWithServerError })
+    mockSummaryApi({ 'GET /months/2026/9/summary': internalErrorResponse })
     renderApp('/')
 
     await screen.findByRole('alert')
@@ -400,7 +400,7 @@ describe('MonthPlanVsActual', () => {
   })
 
   it('explains that the totals could not be loaded', async () => {
-    mockSummaryApi({ 'GET /months/2026/9/summary': respondWithServerError })
+    mockSummaryApi({ 'GET /months/2026/9/summary': internalErrorResponse })
 
     renderApp('/')
 

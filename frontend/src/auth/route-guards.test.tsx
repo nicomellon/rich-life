@@ -1,6 +1,13 @@
 import { screen } from '@testing-library/react'
 import { act } from 'react'
-import { jsonResponse, mockApi, signedInUser, signInBeforeRender } from '@/test/api-mock'
+import {
+  errorResponse,
+  internalErrorResponse,
+  jsonResponse,
+  mockApi,
+  signedInUser,
+  signInBeforeRender,
+} from '@/test/api-mock'
 import { renderApp } from '@/test/render-app'
 
 describe('RequireAuth', () => {
@@ -22,7 +29,7 @@ describe('RequireAuth', () => {
 
   it('sends the user to sign in when the API rejects their token', async () => {
     signInBeforeRender()
-    mockApi({ 'GET /auth/me': () => jsonResponse({ detail: 'Token expired' }, 401) })
+    mockApi({ 'GET /auth/me': () => errorResponse(401, 'not_authenticated', 'Not authenticated') })
 
     renderApp('/plan')
 
@@ -31,7 +38,9 @@ describe('RequireAuth', () => {
 
   it('offers to retry when the account fails to load', async () => {
     signInBeforeRender()
-    mockApi({ 'GET /auth/me': () => jsonResponse({ detail: 'Internal Server Error' }, 500) })
+    mockApi({
+      'GET /auth/me': internalErrorResponse,
+    })
 
     renderApp('/plan')
 
