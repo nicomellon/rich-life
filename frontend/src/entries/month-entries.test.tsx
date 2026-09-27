@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Entry } from '@/entries/entries-api'
 import type { Month } from '@/months/months-api'
@@ -33,6 +33,7 @@ const changedRentEntry: Entry = { ...rentEntry, amount: '1250.00', description: 
 const updatedSeptember2026: Month = { ...startedSeptember2026, income: '3500.00' }
 const summaryOfSavedEntries = summaryOfStartedMonth({ fixed_costs: '1200.00', guilt_free: '45.50' })
 const respondWithServerError = () => jsonResponse({ detail: 'Internal Server Error' }, 500)
+const noEntriesMessage = 'No entries yet. Add your first expense above.'
 
 function mockEntriesApi(extraResponders: Record<string, ApiResponder> = {}) {
   return mockApi({
@@ -140,12 +141,28 @@ describe('MonthEntries', () => {
     ).toBeInTheDocument()
   })
 
-  it('says when a bucket has no entries', async () => {
+  it('says above the buckets when the month has no entries', async () => {
+    mockEntriesApi({
+      'GET /months/2026/9/entries': () => jsonResponse([]),
+      'GET /months/2026/9/summary': () => jsonResponse(summaryOfStartedMonth({})),
+    })
+
+    renderApp('/')
+
+    const noEntriesLine = await screen.findByText(noEntriesMessage)
+    expect(
+      noEntriesLine.compareDocumentPosition(await bucketSection('Fixed Costs')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('does not say the month has no entries once it has one', async () => {
     mockEntriesApi()
 
     renderApp('/')
 
-    expect(within(await bucketSection('Savings')).getByText('No entries yet.')).toBeInTheDocument()
+    await within(await bucketSection('Fixed Costs')).findByText('Rent')
+    expect(screen.queryByText(noEntriesMessage)).not.toBeInTheDocument()
   })
 
   it('names an entry without a description by its amount', async () => {
@@ -557,6 +574,20 @@ describe('MonthEntries', () => {
     expect(wasSent(fetchMock, 'DELETE /entries/1')).toBe(true)
   })
 
+  it('says the month has no entries after its last entry is deleted', async () => {
+    mockEntriesApi({
+      'GET /months/2026/9/entries': inSequence(
+        () => jsonResponse([rentEntry]),
+        () => jsonResponse([]),
+      ),
+    })
+    renderApp('/')
+
+    await deleteRent()
+
+    expect(await screen.findByText(noEntriesMessage)).toBeInTheDocument()
+  })
+
   it('removes the deleted entry from the list', async () => {
     mockEntriesApi({
       'GET /months/2026/9/entries': inSequence(
@@ -568,9 +599,11 @@ describe('MonthEntries', () => {
 
     await deleteRent()
 
-    expect(
-      await within(await bucketSection('Fixed Costs')).findByText('No entries yet.'),
-    ).toBeInTheDocument()
+    await waitFor(async () =>
+      expect(
+        within(await bucketSection('Fixed Costs')).queryByText('Rent'),
+      ).not.toBeInTheDocument(),
+    )
   })
 
   it("updates the bucket's total after deleting an entry", async () => {
@@ -600,9 +633,11 @@ describe('MonthEntries', () => {
 
     await deleteRent()
 
-    expect(
-      await within(await bucketSection('Fixed Costs')).findByText('No entries yet.'),
-    ).toBeInTheDocument()
+    await waitFor(async () =>
+      expect(
+        within(await bucketSection('Fixed Costs')).queryByText('Rent'),
+      ).not.toBeInTheDocument(),
+    )
   })
 
   it('keeps the entry when the deletion is cancelled', async () => {
