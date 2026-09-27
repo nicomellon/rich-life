@@ -1,11 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { useId } from 'react'
 import { useCurrentUser } from '@/auth/auth-context'
+import { LoadingSkeleton } from '@/components/loading-skeleton'
+import { Skeleton } from '@/components/ui/skeleton'
 import { formatApiAmount } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { MonthIncome } from '@/months/month-income'
 import { MonthTargetsEditor } from '@/months/month-targets-editor'
 import type { Month } from '@/months/months-api'
+import { BUCKETS } from '@/spending-plan/buckets'
 import { BucketSummaryCard } from '@/summary/bucket-summary-card'
 import { PlanVsActualChart } from '@/summary/plan-vs-actual-chart'
 import { fetchMonthSummary, monthSummaryQueryKey } from '@/summary/summary-api'
@@ -51,10 +54,13 @@ export function MonthPlanVsActual({ month }: MonthPlanVsActualProps) {
             />
           </>
         )}
+        {summaryQuery.isPending && (
+          <>
+            <MonthTotalSkeleton />
+            <MonthTotalSkeleton />
+          </>
+        )}
       </div>
-      {summaryQuery.isPending && (
-        <p className="text-sm text-muted-foreground">Loading this month's totals…</p>
-      )}
       {summaryQuery.isLoadingError && (
         <p role="alert" className="text-sm text-destructive">
           We couldn't load this month's totals. Please reload the page.
@@ -70,6 +76,7 @@ export function MonthPlanVsActual({ month }: MonthPlanVsActualProps) {
           <h2 className="text-lg font-semibold">Plan vs actual</h2>
           <MonthTargetsEditor month={month} />
         </div>
+        {summaryQuery.isPending && <PlanVsActualSkeleton />}
         {monthSummary && (
           <>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -111,5 +118,36 @@ function MonthTotal({ label, amount, isNegative = false }: MonthTotalProps) {
         {amount}
       </p>
     </div>
+  )
+}
+
+/** Stands in for one of the month's totals. The bucket cards' skeleton carries the label. */
+function MonthTotalSkeleton() {
+  return (
+    <div aria-busy="true" className="space-y-2 rounded-md border p-4">
+      <Skeleton className="h-4 w-32" />
+      <Skeleton className="h-7 w-24" />
+    </div>
+  )
+}
+
+/** Stands in for the bucket cards and the chart. */
+function PlanVsActualSkeleton() {
+  return (
+    <LoadingSkeleton label="Loading this month's totals…" className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        {BUCKETS.map((bucket) => (
+          <div key={bucket} className="space-y-3 rounded-md border p-4">
+            <Skeleton className="h-5 w-36" />
+            <Skeleton className="h-2 w-full rounded-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2 rounded-md border p-4">
+        <Skeleton className="h-5 w-48" />
+        <Skeleton className="h-70 w-full" />
+      </div>
+    </LoadingSkeleton>
   )
 }

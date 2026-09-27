@@ -6,12 +6,14 @@ import {
   inSequence,
   jsonResponse,
   mockApi,
+  neverRespond,
   rentEntry,
   signedInUser,
   signInBeforeRender,
   startedSeptember2026,
   summaryOfStartedMonth,
 } from '@/test/api-mock'
+import { findLoadingSkeleton, unlabelledBusySkeletons } from '@/test/loading-skeleton'
 import { renderApp } from '@/test/render-app'
 
 const summaryWithRent = summaryOfStartedMonth({ fixed_costs: '1200.00' })
@@ -302,6 +304,50 @@ describe('MonthPlanVsActual', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       "We couldn't update this month's totals. Please reload the page.",
     )
+  })
+
+  it("shows a skeleton while the month's totals are loading", async () => {
+    mockSummaryApi({ 'GET /months/2026/9/summary': neverRespond })
+
+    renderApp('/')
+
+    expect(await findLoadingSkeleton("Loading this month's totals…")).toBeInTheDocument()
+  })
+
+  it("marks both totals' skeletons busy while the month's totals are loading", async () => {
+    mockSummaryApi({ 'GET /months/2026/9/summary': neverRespond })
+    renderApp('/')
+
+    await findLoadingSkeleton("Loading this month's totals…")
+
+    expect(unlabelledBusySkeletons()).toHaveLength(2)
+  })
+
+  it("replaces the skeleton with the month's totals once they are loaded", async () => {
+    mockSummaryApi()
+    renderApp('/')
+
+    await bucketCard('Fixed Costs')
+
+    expect(screen.queryByText("Loading this month's totals…")).not.toBeInTheDocument()
+  })
+
+  it("removes the skeleton when the month's totals could not be loaded", async () => {
+    mockSummaryApi({ 'GET /months/2026/9/summary': respondWithServerError })
+    renderApp('/')
+
+    await screen.findByRole('alert')
+
+    expect(screen.queryByText("Loading this month's totals…")).not.toBeInTheDocument()
+  })
+
+  it("leaves no skeleton busy when the month's totals could not be loaded", async () => {
+    mockSummaryApi({ 'GET /months/2026/9/summary': respondWithServerError })
+    renderApp('/')
+
+    await screen.findByRole('alert')
+
+    expect(screen.queryAllByRole('generic', { busy: true })).toEqual([])
   })
 
   it('explains that the totals could not be loaded', async () => {

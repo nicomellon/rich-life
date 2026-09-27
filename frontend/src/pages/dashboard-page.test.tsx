@@ -6,12 +6,14 @@ import {
   inSequence,
   jsonResponse,
   mockApi,
+  neverRespond,
   sentJsonBody,
   signedInUser,
   signInBeforeRender,
   startedSeptember2026,
   summaryOfStartedMonth,
 } from '@/test/api-mock'
+import { findLoadingSkeleton, unlabelledBusySkeletons } from '@/test/loading-skeleton'
 import { createTestQueryClient, renderApp } from '@/test/render-app'
 
 const startedJuly2026: Month = { ...startedSeptember2026, month: 7, income: '2800.00' }
@@ -209,6 +211,59 @@ describe('DashboardPage', () => {
     expect(await shownIncome()).toHaveTextContent('€3,000.00')
   })
 
+  it('shows a skeleton while the months are loading', async () => {
+    mockMonthsApi({ 'GET /months': neverRespond })
+
+    renderApp('/')
+
+    expect(await findLoadingSkeleton('Loading your months…')).toBeInTheDocument()
+  })
+
+  it('marks the month picker skeleton busy while the months are loading', async () => {
+    mockMonthsApi({ 'GET /months': neverRespond })
+    renderApp('/')
+
+    await findLoadingSkeleton('Loading your months…')
+
+    expect(unlabelledBusySkeletons()).toHaveLength(1)
+  })
+
+  it('shows no month picker while the months are loading', async () => {
+    mockMonthsApi({ 'GET /months': neverRespond })
+    renderApp('/')
+
+    await findLoadingSkeleton('Loading your months…')
+
+    expect(screen.queryByRole('combobox', { name: 'Month' })).not.toBeInTheDocument()
+  })
+
+  it('replaces the skeleton with the month once the months are loaded', async () => {
+    mockMonthsApi()
+    renderApp('/')
+
+    await screen.findByRole('button', { name: 'Start this month' })
+
+    expect(screen.queryByText('Loading your months…')).not.toBeInTheDocument()
+  })
+
+  it('removes the skeleton when the months could not be loaded', async () => {
+    mockMonthsApi({ 'GET /months': respondWithServerError })
+    renderApp('/')
+
+    await screen.findByRole('alert')
+
+    expect(screen.queryByText('Loading your months…')).not.toBeInTheDocument()
+  })
+
+  it('shows the month picker when the months could not be loaded', async () => {
+    mockMonthsApi({ 'GET /months': respondWithServerError })
+    renderApp('/')
+
+    await screen.findByRole('alert')
+
+    expect(monthDropdown()).toBeInTheDocument()
+  })
+
   it('explains that the months could not be loaded', async () => {
     mockMonthsApi({ 'GET /months': respondWithServerError })
 
@@ -328,7 +383,7 @@ describe('DashboardPage', () => {
   })
 
   it("can't cancel editing while the income is being saved", async () => {
-    mockStartedMonthsApi({ 'PATCH /months/2026/9': () => new Promise<Response>(() => {}) })
+    mockStartedMonthsApi({ 'PATCH /months/2026/9': neverRespond })
     renderApp('/')
     await editIncome('3500.50')
 

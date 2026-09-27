@@ -2,13 +2,16 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { SpendingPlanPercentages } from '@/spending-plan/spending-plan-api'
 import {
+  type ApiResponder,
   defaultSpendingPlan,
   jsonResponse,
   mockApi,
+  neverRespond,
   sentJsonBody,
   signedInUser,
   signInBeforeRender,
 } from '@/test/api-mock'
+import { findLoadingSkeleton } from '@/test/loading-skeleton'
 import { renderApp } from '@/test/render-app'
 
 const updatedSpendingPlan: SpendingPlanPercentages = {
@@ -19,8 +22,8 @@ const updatedSpendingPlan: SpendingPlanPercentages = {
 }
 
 function mockSpendingPlanApi(
-  updateResponder = () => jsonResponse(updatedSpendingPlan),
-  readResponder = () => jsonResponse(defaultSpendingPlan),
+  updateResponder: ApiResponder = () => jsonResponse(updatedSpendingPlan),
+  readResponder: ApiResponder = () => jsonResponse(defaultSpendingPlan),
 ) {
   return mockApi({
     'GET /auth/me': () => jsonResponse(signedInUser),
@@ -159,6 +162,32 @@ describe('PlanPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       "We couldn't save your spending plan. Please try again.",
     )
+  })
+
+  it('shows a skeleton while the plan is loading', async () => {
+    mockSpendingPlanApi(undefined, neverRespond)
+
+    renderApp('/plan')
+
+    expect(await findLoadingSkeleton('Loading your plan…')).toBeInTheDocument()
+  })
+
+  it('replaces the skeleton with the plan once it is loaded', async () => {
+    mockSpendingPlanApi()
+    renderApp('/plan')
+
+    await findPercentageInput('Fixed Costs')
+
+    expect(screen.queryByText('Loading your plan…')).not.toBeInTheDocument()
+  })
+
+  it('removes the skeleton when the plan could not be loaded', async () => {
+    mockSpendingPlanApi(undefined, () => jsonResponse({ detail: 'Internal Server Error' }, 500))
+    renderApp('/plan')
+
+    await screen.findByRole('alert')
+
+    expect(screen.queryByText('Loading your plan…')).not.toBeInTheDocument()
   })
 
   it('explains that the plan could not be loaded', async () => {
