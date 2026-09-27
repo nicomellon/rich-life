@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { LoadingSkeleton } from '@/components/loading-skeleton'
+import { Skeleton } from '@/components/ui/skeleton'
 import { BucketPercentagesForm } from '@/spending-plan/bucket-percentages-form'
+import { BUCKETS } from '@/spending-plan/buckets'
 import {
   fetchSpendingPlan,
   spendingPlanQueryKey,
@@ -23,9 +26,7 @@ export function PlanPage() {
           Spending. New months start with these percentages.
         </p>
       </div>
-      {spendingPlanQuery.isPending && (
-        <p className="text-sm text-muted-foreground">Loading your plan…</p>
-      )}
+      {spendingPlanQuery.isPending && <SpendingPlanSkeleton />}
       {spendingPlanQuery.isError && (
         <p role="alert" className="text-sm text-destructive">
           We couldn't load your spending plan. Please reload the page.
@@ -51,5 +52,28 @@ export function PlanPage() {
         </p>
       )}
     </section>
+  )
+}
+
+/** Stands in for the plan form: the income preview, a row per bucket, the total and the button. */
+function SpendingPlanSkeleton() {
+  return (
+    <LoadingSkeleton label="Loading your plan…" className="space-y-6">
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-48" />
+        <Skeleton className="h-9 w-48" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <div className="divide-y rounded-md border">
+        {BUCKETS.map((bucket) => (
+          <div key={bucket} className="flex items-center gap-4 p-4">
+            <Skeleton className="h-4 w-44" />
+            <Skeleton className="h-9 w-24" />
+          </div>
+        ))}
+      </div>
+      <Skeleton className="h-4 w-40" />
+      <Skeleton className="h-9 w-28" />
+    </LoadingSkeleton>
   )
 }

@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useId } from 'react'
 import { useCurrentUser } from '@/auth/auth-context'
+import { LoadingSkeleton } from '@/components/loading-skeleton'
+import { Skeleton } from '@/components/ui/skeleton'
 import { AddEntryForm } from '@/entries/add-entry-form'
 import { fetchMonthEntries, monthEntriesQueryKey, type Entry } from '@/entries/entries-api'
 import { EntryRow } from '@/entries/entry-row'
@@ -35,12 +37,15 @@ export function MonthEntries({ calendarMonth }: MonthEntriesProps) {
     <section className="space-y-4">
       <h2 className="text-lg font-semibold">Entries</h2>
       <AddEntryForm calendarMonth={calendarMonth} />
-      {entriesQuery.isPending && (
-        <p className="text-sm text-muted-foreground">Loading your entries…</p>
-      )}
+      {entriesQuery.isPending && <EntriesSkeleton />}
       {entriesQuery.isLoadingError && (
         <p role="alert" className="text-sm text-destructive">
           We couldn't load this month's entries. Please reload the page.
+        </p>
+      )}
+      {entriesQuery.data?.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          No entries yet. Add your first expense above.
         </p>
       )}
       {entriesQuery.data &&
@@ -57,6 +62,21 @@ export function MonthEntries({ calendarMonth }: MonthEntriesProps) {
           />
         ))}
     </section>
+  )
+}
+
+/** Stands in for the entries: a section per bucket with a couple of rows. */
+function EntriesSkeleton() {
+  return (
+    <LoadingSkeleton label="Loading your entries…" className="space-y-4">
+      {BUCKETS.map((bucket) => (
+        <div key={bucket} className="space-y-3 rounded-md border p-4">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+      ))}
+    </LoadingSkeleton>
   )
 }
 
@@ -92,9 +112,7 @@ function BucketEntries({
           </p>
         )}
       </div>
-      {bucketEntries.length === 0 ? (
-        <p className="pt-2 text-sm text-muted-foreground">No entries yet.</p>
-      ) : (
+      {bucketEntries.length > 0 && (
         <ul className="divide-y">
           {bucketEntries.map((entry) => (
             <EntryRow

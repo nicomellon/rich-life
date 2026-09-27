@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router'
+import { LoadingSkeleton } from '@/components/loading-skeleton'
+import { Skeleton } from '@/components/ui/skeleton'
 import { MonthEntries } from '@/entries/month-entries'
 import {
   currentCalendarMonth,
@@ -11,6 +13,7 @@ import {
 import { MonthPicker } from '@/months/month-picker'
 import { fetchMonths, monthsQueryKey } from '@/months/months-api'
 import { StartMonthForm } from '@/months/start-month-form'
+import { BUCKETS } from '@/spending-plan/buckets'
 import { MonthPlanVsActual } from '@/summary/month-plan-vs-actual'
 
 export function DashboardPage() {
@@ -37,15 +40,17 @@ export function DashboardPage() {
             This month's plan versus what you've actually spent.
           </p>
         </div>
-        <MonthPicker
-          selectedMonth={selectedMonth}
-          startedMonths={startedMonths}
-          onSelect={selectMonth}
-        />
+        {monthsQuery.isPending ? (
+          <MonthPickerSkeleton />
+        ) : (
+          <MonthPicker
+            selectedMonth={selectedMonth}
+            startedMonths={startedMonths}
+            onSelect={selectMonth}
+          />
+        )}
       </div>
-      {monthsQuery.isPending && (
-        <p className="text-sm text-muted-foreground">Loading your months…</p>
-      )}
+      {monthsQuery.isPending && <MonthSkeleton />}
       {monthsQuery.isLoadingError && (
         <p role="alert" className="text-sm text-destructive">
           We couldn't load your months. Please reload the page.
@@ -60,8 +65,46 @@ export function DashboardPage() {
             <MonthEntries calendarMonth={selectedMonth} />
           </div>
         ) : (
-          <StartMonthForm key={toMonthKey(selectedMonth)} calendarMonth={selectedMonth} />
+          <div key={toMonthKey(selectedMonth)} className="space-y-4">
+            {startedMonths.length === 0 && (
+              <p>Welcome to Rich Life. Start your first month by entering this month's income.</p>
+            )}
+            <StartMonthForm calendarMonth={selectedMonth} />
+          </div>
         ))}
     </section>
+  )
+}
+
+/**
+ * Stands in for the month picker: two arrows around the dropdown. The month skeleton below
+ * carries the loading label.
+ */
+function MonthPickerSkeleton() {
+  return (
+    <div aria-busy="true" className="flex items-center gap-2">
+      <Skeleton className="size-9" />
+      <Skeleton className="h-9 w-40" />
+      <Skeleton className="size-9" />
+    </div>
+  )
+}
+
+/** Stands in for the selected month: its totals, then its bucket cards. */
+function MonthSkeleton() {
+  return (
+    <LoadingSkeleton label="Loading your months…" className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[0, 1, 2].map((totalIndex) => (
+          <Skeleton key={totalIndex} className="h-20" />
+        ))}
+      </div>
+      <Skeleton className="h-7 w-40" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        {BUCKETS.map((bucket) => (
+          <Skeleton key={bucket} className="h-32" />
+        ))}
+      </div>
+    </LoadingSkeleton>
   )
 }
