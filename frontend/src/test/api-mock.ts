@@ -127,6 +127,11 @@ function bucketStatus(targetAmount: number, actualAmount: number): BucketStatus 
   return 'on_track'
 }
 
+/** The backend's `actual_pct`: `amount` as a percentage of `income`, or 0 when the income is 0. */
+function shareOfIncome(amount: number, income: number): string {
+  return income === 0 ? '0.00' : ((amount / income) * 100).toFixed(2)
+}
+
 /**
  * The summary of a month on the default plan, whose entries add up to `actualAmountsByBucket`
  * (0 for the buckets left out).
@@ -144,7 +149,7 @@ export function summaryOfStartedMonth(
       target_pct: targetPercentage,
       target_amount: targetAmount.toFixed(2),
       actual_amount: actualAmount.toFixed(2),
-      actual_pct: ((actualAmount / Number(income)) * 100).toFixed(2),
+      actual_pct: shareOfIncome(actualAmount, Number(income)),
       remaining: (targetAmount - actualAmount).toFixed(2),
       status: bucketStatus(targetAmount, actualAmount),
     }

@@ -3,7 +3,7 @@ import { useId } from 'react'
 import { useCurrentUser } from '@/auth/auth-context'
 import { LoadingSkeleton } from '@/components/loading-skeleton'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatApiAmount } from '@/lib/money'
+import { formatApiAmount, parseAmountInCents } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { MonthIncome } from '@/months/month-income'
 import { MonthTargetsEditor } from '@/months/month-targets-editor'
@@ -76,6 +76,11 @@ export function MonthPlanVsActual({ month }: MonthPlanVsActualProps) {
           <h2 className="text-lg font-semibold">Plan vs actual</h2>
           <MonthTargetsEditor month={month} />
         </div>
+        {parseAmountInCents(month.income) === 0 && (
+          <p className="text-sm text-muted-foreground">
+            Add this month's income to see your targets.
+          </p>
+        )}
         {summaryQuery.isPending && <PlanVsActualSkeleton />}
         {monthSummary && (
           <>
