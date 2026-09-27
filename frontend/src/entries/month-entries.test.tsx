@@ -10,9 +10,12 @@ import {
   internalErrorResponse,
   jsonResponse,
   mockApi,
+  networkFailure,
   neverRespond,
   rentEntry,
+  DATABASE_UNAVAILABLE_MESSAGE,
   sentJsonBody,
+  databaseUnavailableResponse,
   signedInUser,
   signInBeforeRender,
   startedSeptember2026,
@@ -21,6 +24,7 @@ import {
 } from '@/test/api-mock'
 import { findLoadingSkeleton } from '@/test/loading-skeleton'
 import { renderApp } from '@/test/render-app'
+import { findToast } from '@/test/toasts'
 
 const lunchEntry: Entry = {
   id: 3,
@@ -432,15 +436,55 @@ describe('MonthEntries', () => {
     expect(within(await addEntryForm()).getByLabelText('Amount')).toBeDisabled()
   })
 
-  it('explains that adding the entry failed', async () => {
-    mockEntriesApi({ 'POST /months/2026/9/entries': internalErrorResponse })
+  it('confirms that the entry was added', async () => {
+    mockEntriesApi()
     renderApp('/')
 
     await addLunch()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "We couldn't add the entry. Please try again.",
+    expect(await findToast('Entry added')).toHaveAttribute('data-type', 'success')
+  })
+
+  it("shows the server's message when adding the entry fails", async () => {
+    mockEntriesApi({ 'POST /months/2026/9/entries': databaseUnavailableResponse })
+    renderApp('/')
+
+    await addLunch()
+
+    expect(await findToast(DATABASE_UNAVAILABLE_MESSAGE)).toHaveAttribute('data-type', 'error')
+  })
+
+  it('says the server could not be reached when adding the entry fails offline', async () => {
+    mockEntriesApi({ 'POST /months/2026/9/entries': networkFailure })
+    renderApp('/')
+
+    await addLunch()
+
+    expect(
+      await findToast("Couldn't reach the server. Check your connection and try again."),
+    ).toHaveAttribute('data-type', 'error')
+  })
+
+  it('keeps the typed entry when adding it fails', async () => {
+    mockEntriesApi({ 'POST /months/2026/9/entries': databaseUnavailableResponse })
+    renderApp('/')
+
+    await addLunch()
+
+    await findToast(DATABASE_UNAVAILABLE_MESSAGE)
+    expect(within(await addEntryForm()).getByLabelText('Description (optional)')).toHaveValue(
+      'Lunch',
     )
+  })
+
+  it('shows no inline alert when adding the entry fails', async () => {
+    mockEntriesApi({ 'POST /months/2026/9/entries': databaseUnavailableResponse })
+    renderApp('/')
+
+    await addLunch()
+
+    await findToast(DATABASE_UNAVAILABLE_MESSAGE)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it("starts editing with the entry's amount", async () => {
@@ -545,15 +589,43 @@ describe('MonthEntries', () => {
     expect(form.getByLabelText('Amount')).toBeDisabled()
   })
 
-  it('explains that saving the entry failed', async () => {
-    mockEntriesApi({ 'PATCH /entries/1': internalErrorResponse })
+  it('confirms that the entry was saved', async () => {
+    mockEntriesApi()
     renderApp('/')
 
     await changeRent()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "We couldn't save the entry. Please try again.",
-    )
+    expect(await findToast('Entry saved')).toHaveAttribute('data-type', 'success')
+  })
+
+  it("shows the server's message when saving the entry fails", async () => {
+    mockEntriesApi({ 'PATCH /entries/1': databaseUnavailableResponse })
+    renderApp('/')
+
+    await changeRent()
+
+    expect(await findToast(DATABASE_UNAVAILABLE_MESSAGE)).toHaveAttribute('data-type', 'error')
+  })
+
+  it('keeps the typed changes when saving the entry fails', async () => {
+    mockEntriesApi({ 'PATCH /entries/1': databaseUnavailableResponse })
+    renderApp('/')
+
+    await changeRent()
+
+    await findToast(DATABASE_UNAVAILABLE_MESSAGE)
+    const form = within(screen.getByRole('form', { name: 'Edit Rent' }))
+    expect(form.getByLabelText('Description (optional)')).toHaveValue('Rent and bills')
+  })
+
+  it('shows no inline alert when saving the entry fails', async () => {
+    mockEntriesApi({ 'PATCH /entries/1': databaseUnavailableResponse })
+    renderApp('/')
+
+    await changeRent()
+
+    await findToast(DATABASE_UNAVAILABLE_MESSAGE)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('asks to confirm before deleting an entry', async () => {
@@ -670,15 +742,42 @@ describe('MonthEntries', () => {
     expect(within(await bucketSection('Fixed Costs')).getByText('Rent')).toBeInTheDocument()
   })
 
-  it('explains that deleting the entry failed', async () => {
-    mockEntriesApi({ 'DELETE /entries/1': internalErrorResponse })
+  it('confirms that the entry was deleted', async () => {
+    mockEntriesApi()
     renderApp('/')
 
     await deleteRent()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "We couldn't delete the entry. Please try again.",
-    )
+    expect(await findToast('Entry deleted')).toHaveAttribute('data-type', 'success')
+  })
+
+  it("shows the server's message when deleting the entry fails", async () => {
+    mockEntriesApi({ 'DELETE /entries/1': databaseUnavailableResponse })
+    renderApp('/')
+
+    await deleteRent()
+
+    expect(await findToast(DATABASE_UNAVAILABLE_MESSAGE)).toHaveAttribute('data-type', 'error')
+  })
+
+  it('keeps the entry in the list when deleting it fails', async () => {
+    mockEntriesApi({ 'DELETE /entries/1': databaseUnavailableResponse })
+    renderApp('/')
+
+    await deleteRent()
+
+    await findToast(DATABASE_UNAVAILABLE_MESSAGE)
+    expect(within(await bucketSection('Fixed Costs')).getByText(/Rent/)).toBeInTheDocument()
+  })
+
+  it('shows no inline alert when deleting the entry fails', async () => {
+    mockEntriesApi({ 'DELETE /entries/1': databaseUnavailableResponse })
+    renderApp('/')
+
+    await deleteRent()
+
+    await findToast(DATABASE_UNAVAILABLE_MESSAGE)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it("updates the buckets' targets after the income is saved", async () => {

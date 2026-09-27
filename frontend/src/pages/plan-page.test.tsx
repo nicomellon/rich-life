@@ -8,12 +8,15 @@ import {
   jsonResponse,
   mockApi,
   neverRespond,
+  DATABASE_UNAVAILABLE_MESSAGE,
   sentJsonBody,
+  databaseUnavailableResponse,
   signedInUser,
   signInBeforeRender,
 } from '@/test/api-mock'
 import { findLoadingSkeleton } from '@/test/loading-skeleton'
 import { renderApp } from '@/test/render-app'
+import { findToast } from '@/test/toasts'
 
 const updatedSpendingPlan: SpendingPlanPercentages = {
   fixed_costs_pct: '45.00',
@@ -127,42 +130,50 @@ describe('PlanPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Save plan' }))
 
-    await screen.findByText('Your spending plan is saved.')
+    await findToast('Spending plan saved')
     expect(sentJsonBody(fetchMock, 'PUT /spending-plan')).toEqual(updatedSpendingPlan)
   })
 
-  it('confirms that the plan is saved', async () => {
+  it('confirms that the plan was saved', async () => {
     mockSpendingPlanApi()
     renderApp('/plan')
     await moveFivePercentFromFixedCostsToInvestments()
 
     await userEvent.click(screen.getByRole('button', { name: 'Save plan' }))
 
-    expect(await screen.findByText('Your spending plan is saved.')).toBeInTheDocument()
+    expect(await findToast('Spending plan saved')).toHaveAttribute('data-type', 'success')
   })
 
-  it('hides the saved confirmation once the user edits again', async () => {
-    mockSpendingPlanApi()
-    renderApp('/plan')
-    await moveFivePercentFromFixedCostsToInvestments()
-    await userEvent.click(screen.getByRole('button', { name: 'Save plan' }))
-    await screen.findByText('Your spending plan is saved.')
-
-    await typePercentage('Savings', '19')
-
-    expect(screen.queryByText('Your spending plan is saved.')).not.toBeInTheDocument()
-  })
-
-  it('explains that saving failed', async () => {
-    mockSpendingPlanApi(internalErrorResponse)
+  it("shows the server's message when saving fails", async () => {
+    mockSpendingPlanApi(databaseUnavailableResponse)
     renderApp('/plan')
     await moveFivePercentFromFixedCostsToInvestments()
 
     await userEvent.click(screen.getByRole('button', { name: 'Save plan' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "We couldn't save your spending plan. Please try again.",
-    )
+    expect(await findToast(DATABASE_UNAVAILABLE_MESSAGE)).toHaveAttribute('data-type', 'error')
+  })
+
+  it('keeps the typed percentages when saving fails', async () => {
+    mockSpendingPlanApi(databaseUnavailableResponse)
+    renderApp('/plan')
+    await moveFivePercentFromFixedCostsToInvestments()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save plan' }))
+
+    await findToast(DATABASE_UNAVAILABLE_MESSAGE)
+    expect(screen.getByLabelText('Investments')).toHaveValue('15')
+  })
+
+  it('shows no inline alert when saving fails', async () => {
+    mockSpendingPlanApi(databaseUnavailableResponse)
+    renderApp('/plan')
+    await moveFivePercentFromFixedCostsToInvestments()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save plan' }))
+
+    await findToast(DATABASE_UNAVAILABLE_MESSAGE)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('shows a skeleton while the plan is loading', async () => {

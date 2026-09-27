@@ -4,6 +4,7 @@ import { useId, useState, type FormEvent } from 'react'
 import { useCurrentUser } from '@/auth/auth-context'
 import { Button } from '@/components/ui/button'
 import { formatMoney, parseAmountInCents, toApiAmount } from '@/lib/money'
+import { showSaveFailedToast, showSavedToast } from '@/lib/save-toasts'
 import { IncomeField } from '@/months/income-field'
 import { storeSavedMonth, updateMonthIncome, type Month } from '@/months/months-api'
 import { monthSummaryQueryKey } from '@/summary/summary-api'
@@ -25,11 +26,14 @@ export function MonthIncome({ month }: MonthIncomeProps) {
   const saveMutation = useMutation({
     mutationFn: (newIncome: string) => updateMonthIncome(month, newIncome),
     onSuccess: async (updatedMonth) => {
+      showSavedToast('Income saved')
       await storeSavedMonth(queryClient, updatedMonth)
       // The bucket targets are shares of the income.
       void queryClient.invalidateQueries({ queryKey: monthSummaryQueryKey(month) })
       setIsEditing(false)
     },
+    // The form stays open with what the user typed, to try again.
+    onError: showSaveFailedToast,
   })
 
   function startEditing() {
@@ -87,11 +91,6 @@ export function MonthIncome({ month }: MonthIncomeProps) {
           Cancel
         </Button>
       </div>
-      {saveMutation.isError && (
-        <p role="alert" className="text-sm text-destructive">
-          We couldn't save the income. Please try again.
-        </p>
-      )}
     </form>
   )
 }

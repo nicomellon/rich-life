@@ -16,6 +16,7 @@ import {
   signedInUser,
 } from '@/test/api-mock'
 import { renderApp } from '@/test/render-app'
+import { shownToasts } from '@/test/toasts'
 
 vi.mock('@simplewebauthn/browser', () => ({
   browserSupportsWebAuthn: vi.fn(),
@@ -135,6 +136,18 @@ describe('SignInPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       "We couldn't verify your passkey. Please try again.",
     )
+  })
+
+  it('shows no toast when the backend rejects the passkey', async () => {
+    mockSignInApi(() =>
+      errorResponse(401, 'passkey_verification_failed', 'Passkey verification failed'),
+    )
+    renderApp('/sign-in')
+
+    await clickSignIn()
+
+    await screen.findByRole('alert')
+    expect(await shownToasts()).toEqual([])
   })
 
   it("explains that the browser doesn't support passkeys", () => {

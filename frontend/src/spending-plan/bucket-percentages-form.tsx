@@ -23,8 +23,6 @@ interface BucketPercentagesFormProps {
   isSaving: boolean
   /** The submit button's text, e.g. "Save plan". */
   submitLabel: string
-  /** Called whenever the user changes a field. */
-  onEdit?: () => void
   /**
    * The income, as the API writes it, that the form previews each bucket's share of. Without it,
    * the form has an optional field to type one.
@@ -43,7 +41,6 @@ export function BucketPercentagesForm({
   onSave,
   isSaving,
   submitLabel,
-  onEdit,
   previewIncome,
   onCancel,
 }: BucketPercentagesFormProps) {
@@ -68,7 +65,6 @@ export function BucketPercentagesForm({
       ...previousTypedPercentages,
       [bucket]: typedPercentage,
     }))
-    onEdit?.()
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {

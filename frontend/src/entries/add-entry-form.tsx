@@ -9,6 +9,7 @@ import {
 } from '@/entries/entries-api'
 import { defaultEntryDate } from '@/entries/entry-date'
 import { EntryForm, type TypedEntry } from '@/entries/entry-form'
+import { showSaveFailedToast, showSavedToast } from '@/lib/save-toasts'
 import type { CalendarMonth } from '@/months/calendar-month'
 import { BUCKETS } from '@/spending-plan/buckets'
 
@@ -30,6 +31,7 @@ export function AddEntryForm({ calendarMonth }: AddEntryFormProps) {
   const addMutation = useMutation({
     mutationFn: (newEntry: NewEntry) => createEntry(calendarMonth, newEntry),
     onSuccess: async (createdEntry) => {
+      showSavedToast('Entry added')
       // The next entry keeps the bucket and date, which suits adding several in a row.
       setNextEntry({
         typedAmount: '',
@@ -42,6 +44,8 @@ export function AddEntryForm({ calendarMonth }: AddEntryFormProps) {
       await storeAddedEntry(queryClient, calendarMonth, createdEntry)
       await refreshMonthEntries(queryClient, calendarMonth)
     },
+    // The form keeps what the user typed, to try again.
+    onError: showSaveFailedToast,
   })
 
   return (
@@ -60,11 +64,6 @@ export function AddEntryForm({ calendarMonth }: AddEntryFormProps) {
           </Button>
         )}
       />
-      {addMutation.isError && (
-        <p role="alert" className="text-sm text-destructive">
-          We couldn't add the entry. Please try again.
-        </p>
-      )}
     </div>
   )
 }
