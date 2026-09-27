@@ -1,10 +1,11 @@
 from datetime import MAXYEAR, MINYEAR
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Path, status
+from fastapi import Depends, Path
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.api.errors import ENTRY_NOT_FOUND, MONTH_NOT_FOUND, NOT_AUTHENTICATED, ApiError
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.entry import Entry
@@ -26,19 +27,14 @@ def get_current_user(
 ) -> User:
     """The user the request's bearer token belongs to. Responds 401 if the token is
     missing, invalid or expired, or its user no longer exists."""
-    unauthorized = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Not authenticated",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
     if credentials is None:
-        raise unauthorized
+        raise ApiError(NOT_AUTHENTICATED)
     claims = decode_access_token(credentials.credentials)
     if claims is None:
-        raise unauthorized
+        raise ApiError(NOT_AUTHENTICATED)
     user = db.get(User, claims.user_id)
     if user is None:
-        raise unauthorized
+        raise ApiError(NOT_AUTHENTICATED)
     return user
 
 
@@ -54,7 +50,7 @@ def get_requested_month(
     """The signed-in user's month from the path. Responds 404 if they don't have it."""
     requested_month = months.find_month(db, user, year, month)
     if requested_month is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Month not found")
+        raise ApiError(MONTH_NOT_FOUND)
     return requested_month
 
 
@@ -72,7 +68,7 @@ def get_requested_entry(
     including when it belongs to another user."""
     requested_entry = entries.find_entry(db, user, entry_id)
     if requested_entry is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Entry not found")
+        raise ApiError(ENTRY_NOT_FOUND)
     return requested_entry
 
 
