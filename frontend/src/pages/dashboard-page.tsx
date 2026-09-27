@@ -65,7 +65,12 @@ export function DashboardPage() {
             <MonthEntries calendarMonth={selectedMonth} />
           </div>
         ) : (
-          <StartMonthForm key={toMonthKey(selectedMonth)} calendarMonth={selectedMonth} />
+          <div key={toMonthKey(selectedMonth)} className="space-y-4">
+            {startedMonths.length === 0 && (
+              <p>Welcome to Rich Life. Start your first month by entering this month's income.</p>
+            )}
+            <StartMonthForm calendarMonth={selectedMonth} />
+          </div>
         ))}
     </section>
   )

@@ -1,6 +1,7 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Entry } from '@/entries/entries-api'
+import type { Month } from '@/months/months-api'
 import {
   type ApiResponder,
   inSequence,
@@ -18,6 +19,17 @@ import { renderApp } from '@/test/render-app'
 
 const summaryWithRent = summaryOfStartedMonth({ fixed_costs: '1200.00' })
 const respondWithServerError = () => jsonResponse({ detail: 'Internal Server Error' }, 500)
+const incomeHint = "Add this month's income to see your targets."
+const septemberWithoutIncome: Month = { ...startedSeptember2026, income: '0.00' }
+
+function mockSummaryApiWithoutIncome(extraResponders: Record<string, ApiResponder> = {}) {
+  return mockSummaryApi({
+    'GET /months': () => jsonResponse([septemberWithoutIncome]),
+    'GET /months/2026/9/entries': () => jsonResponse([]),
+    'GET /months/2026/9/summary': () => jsonResponse(summaryOfStartedMonth({}, '0.00')),
+    ...extraResponders,
+  })
+}
 
 const investmentEntry: Entry = {
   id: 4,
@@ -70,6 +82,14 @@ async function addInvestment() {
   await userEvent.selectOptions(form.getByLabelText('Bucket'), 'Investments')
   await userEvent.type(form.getByLabelText('Description (optional)'), 'ETF')
   await userEvent.click(form.getByRole('button', { name: 'Add entry' }))
+}
+
+async function saveIncome(typedIncome: string) {
+  await userEvent.click(await screen.findByRole('button', { name: 'Edit income' }))
+  const incomeInput = screen.getByLabelText('Income')
+  await userEvent.clear(incomeInput)
+  await userEvent.type(incomeInput, typedIncome)
+  await userEvent.click(screen.getByRole('button', { name: 'Save income' }))
 }
 
 describe('MonthPlanVsActual', () => {
@@ -288,6 +308,35 @@ describe('MonthPlanVsActual', () => {
       'Actual, on track',
       'Actual, over budget',
     ])
+  })
+
+  it('asks for the income when the month has none', async () => {
+    mockSummaryApiWithoutIncome()
+
+    renderApp('/')
+
+    expect(await screen.findByText(incomeHint)).toBeInTheDocument()
+  })
+
+  it('does not ask for the income when the month has one', async () => {
+    mockSummaryApi()
+
+    renderApp('/')
+
+    await bucketCard('Fixed Costs')
+    expect(screen.queryByText(incomeHint)).not.toBeInTheDocument()
+  })
+
+  it('stops asking for the income once one is saved', async () => {
+    mockSummaryApiWithoutIncome({
+      'PATCH /months/2026/9': () => jsonResponse(startedSeptember2026),
+    })
+    renderApp('/')
+    await screen.findByText(incomeHint)
+
+    await saveIncome('3000')
+
+    await waitFor(() => expect(screen.queryByText(incomeHint)).not.toBeInTheDocument())
   })
 
   it('explains that the totals could not be updated after an entry is added', async () => {

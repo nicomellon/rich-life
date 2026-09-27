@@ -43,6 +43,11 @@ export function MonthEntries({ calendarMonth }: MonthEntriesProps) {
           We couldn't load this month's entries. Please reload the page.
         </p>
       )}
+      {entriesQuery.data?.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          No entries yet. Add your first expense above.
+        </p>
+      )}
       {entriesQuery.data &&
         BUCKETS.map((bucket) => (
           <BucketEntries
@@ -107,9 +112,7 @@ function BucketEntries({
           </p>
         )}
       </div>
-      {bucketEntries.length === 0 ? (
-        <p className="pt-2 text-sm text-muted-foreground">No entries yet.</p>
-      ) : (
+      {bucketEntries.length > 0 && (
         <ul className="divide-y">
           {bucketEntries.map((entry) => (
             <EntryRow
