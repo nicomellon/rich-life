@@ -574,6 +574,17 @@ describe('MonthEntries', () => {
     expect(wasSent(fetchMock, 'DELETE /entries/1')).toBe(true)
   })
 
+  it('shows no empty-state text in a bucket without entries', async () => {
+    mockEntriesApi()
+
+    renderApp('/')
+
+    await within(await bucketSection('Fixed Costs')).findByText('Rent')
+    expect(
+      within(await bucketSection('Savings')).queryByText(/No entries yet/),
+    ).not.toBeInTheDocument()
+  })
+
   it('says the month has no entries after its last entry is deleted', async () => {
     mockEntriesApi({
       'GET /months/2026/9/entries': inSequence(
