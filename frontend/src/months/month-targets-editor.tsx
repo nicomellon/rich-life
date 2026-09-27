@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { SlidersHorizontal } from 'lucide-react'
 import { useId, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { showSaveFailedToast, showSavedToast } from '@/lib/save-toasts'
 import { storeSavedMonth, updateMonthTargets, type Month } from '@/months/months-api'
 import { BucketPercentagesForm } from '@/spending-plan/bucket-percentages-form'
 import type { SpendingPlanPercentages } from '@/spending-plan/spending-plan-api'
@@ -23,11 +24,14 @@ export function MonthTargetsEditor({ month }: MonthTargetsEditorProps) {
   const saveMutation = useMutation({
     mutationFn: (newTargets: SpendingPlanPercentages) => updateMonthTargets(month, newTargets),
     onSuccess: async (updatedMonth) => {
+      showSavedToast('Targets saved')
       await storeSavedMonth(queryClient, updatedMonth)
       // The summary's target amounts come from the percentages.
       void queryClient.invalidateQueries({ queryKey: monthSummaryQueryKey(month) })
       setIsEditing(false)
     },
+    // The form stays open with what the user typed, to try again.
+    onError: showSaveFailedToast,
   })
 
   function startEditing() {
@@ -59,15 +63,9 @@ export function MonthTargetsEditor({ month }: MonthTargetsEditorProps) {
         onSave={saveMutation.mutate}
         isSaving={saveMutation.isPending}
         submitLabel="Save this month's plan"
-        onEdit={saveMutation.reset}
         previewIncome={month.income}
         onCancel={() => setIsEditing(false)}
       />
-      {saveMutation.isError && (
-        <p role="alert" className="text-sm text-destructive">
-          We couldn't save this month's plan. Please try again.
-        </p>
-      )}
     </section>
   )
 }

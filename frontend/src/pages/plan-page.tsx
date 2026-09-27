@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LoadingSkeleton } from '@/components/loading-skeleton'
 import { Skeleton } from '@/components/ui/skeleton'
+import { showSaveFailedToast, showSavedToast } from '@/lib/save-toasts'
 import { BucketPercentagesForm } from '@/spending-plan/bucket-percentages-form'
 import { BUCKETS } from '@/spending-plan/buckets'
 import {
@@ -14,7 +15,12 @@ export function PlanPage() {
   const spendingPlanQuery = useQuery({ queryKey: spendingPlanQueryKey, queryFn: fetchSpendingPlan })
   const saveMutation = useMutation({
     mutationFn: updateSpendingPlan,
-    onSuccess: (savedPlan) => queryClient.setQueryData(spendingPlanQueryKey, savedPlan),
+    onSuccess: (savedPlan) => {
+      showSavedToast('Spending plan saved')
+      queryClient.setQueryData(spendingPlanQueryKey, savedPlan)
+    },
+    // The form keeps what the user typed, to try again.
+    onError: showSaveFailedToast,
   })
 
   return (
@@ -38,18 +44,7 @@ export function PlanPage() {
           onSave={saveMutation.mutate}
           isSaving={saveMutation.isPending}
           submitLabel="Save plan"
-          onEdit={saveMutation.reset}
         />
-      )}
-      {saveMutation.isSuccess && (
-        <p role="status" className="text-sm">
-          Your spending plan is saved.
-        </p>
-      )}
-      {saveMutation.isError && (
-        <p role="alert" className="text-sm text-destructive">
-          We couldn't save your spending plan. Please try again.
-        </p>
       )}
     </section>
   )

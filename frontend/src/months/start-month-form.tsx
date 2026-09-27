@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api'
 import { parseAmountInCents, toApiAmount } from '@/lib/money'
+import { showSaveFailedToast, showSavedToast } from '@/lib/save-toasts'
 import { formatCalendarMonth, type CalendarMonth } from '@/months/calendar-month'
 import { IncomeField } from '@/months/income-field'
 import { createMonth, monthsQueryKey, storeSavedMonth } from '@/months/months-api'
@@ -19,11 +20,16 @@ export function StartMonthForm({ calendarMonth }: StartMonthFormProps) {
   const incomeInCents = parseAmountInCents(typedIncome)
   const startMutation = useMutation({
     mutationFn: createMonth,
-    onSuccess: (createdMonth) => storeSavedMonth(queryClient, createdMonth),
+    onSuccess: (createdMonth) => {
+      showSavedToast('Month started')
+      return storeSavedMonth(queryClient, createdMonth)
+    },
     onError: (startError) => {
       // Started meanwhile, e.g. in another tab: loading the months shows it.
       if (isAlreadyStartedError(startError)) {
         void queryClient.invalidateQueries({ queryKey: monthsQueryKey })
+      } else {
+        showSaveFailedToast(startError)
       }
     },
   })
@@ -55,11 +61,6 @@ export function StartMonthForm({ calendarMonth }: StartMonthFormProps) {
           {startMutation.isPending ? 'Starting…' : 'Start this month'}
         </Button>
       </form>
-      {startMutation.isError && !isAlreadyStartedError(startMutation.error) && (
-        <p role="alert" className="text-sm text-destructive">
-          We couldn't start this month. Please try again.
-        </p>
-      )}
     </div>
   )
 }

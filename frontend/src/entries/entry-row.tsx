@@ -13,6 +13,7 @@ import {
 } from '@/entries/entries-api'
 import { formatEntryDate } from '@/entries/entry-date'
 import { EntryForm, type TypedEntry } from '@/entries/entry-form'
+import { showSaveFailedToast, showSavedToast } from '@/lib/save-toasts'
 import type { CalendarMonth } from '@/months/calendar-month'
 
 type EntryRowMode = 'viewing' | 'editing' | 'confirmingDelete'
@@ -33,19 +34,24 @@ export function EntryRow({ entry, calendarMonth, formatAmount }: EntryRowProps) 
   const updateMutation = useMutation({
     mutationFn: (changedEntry: NewEntry) => updateEntry(entry.id, changedEntry),
     onSuccess: async (updatedEntry) => {
+      showSavedToast('Entry saved')
       // Shown even if reloading the entries fails.
       await storeUpdatedEntry(queryClient, calendarMonth, updatedEntry)
       await refreshMonthEntries(queryClient, calendarMonth)
       setMode('viewing')
     },
+    // The form stays open with what the user typed, to try again.
+    onError: showSaveFailedToast,
   })
   const deleteMutation = useMutation({
     mutationFn: () => deleteEntry(entry.id),
     onSuccess: async () => {
+      showSavedToast('Entry deleted')
       // Gone from the list even if reloading the entries fails.
       await removeStoredEntry(queryClient, calendarMonth, entry.id)
       await refreshMonthEntries(queryClient, calendarMonth)
     },
+    onError: showSaveFailedToast,
   })
 
   function switchTo(nextMode: EntryRowMode) {
@@ -79,11 +85,6 @@ export function EntryRow({ entry, calendarMonth, formatAmount }: EntryRowProps) 
             </>
           )}
         />
-        {updateMutation.isError && (
-          <p role="alert" className="text-sm text-destructive">
-            We couldn't save the entry. Please try again.
-          </p>
-        )}
       </li>
     )
   }
@@ -110,11 +111,6 @@ export function EntryRow({ entry, calendarMonth, formatAmount }: EntryRowProps) 
             Cancel
           </Button>
         </div>
-        {deleteMutation.isError && (
-          <p role="alert" className="text-sm text-destructive">
-            We couldn't delete the entry. Please try again.
-          </p>
-        )}
       </li>
     )
   }

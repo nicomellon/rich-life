@@ -9,7 +9,9 @@ import {
   jsonResponse,
   mockApi,
   neverRespond,
+  DATABASE_UNAVAILABLE_MESSAGE,
   sentJsonBody,
+  databaseUnavailableResponse,
   signedInUser,
   signInBeforeRender,
   startedSeptember2026,
@@ -17,6 +19,7 @@ import {
 } from '@/test/api-mock'
 import { findLoadingSkeleton, unlabelledBusySkeletons } from '@/test/loading-skeleton'
 import { createTestQueryClient, renderApp } from '@/test/render-app'
+import { findToast, shownToasts } from '@/test/toasts'
 
 const startedJuly2026: Month = { ...startedSeptember2026, month: 7, income: '2800.00' }
 const updatedSeptember2026: Month = { ...startedSeptember2026, income: '3500.50' }
@@ -153,15 +156,42 @@ describe('DashboardPage', () => {
     )
   })
 
-  it('explains that starting the month failed', async () => {
-    mockMonthsApi({ 'POST /months': internalErrorResponse })
+  it('confirms that the month was started', async () => {
+    mockMonthsApi()
     renderApp('/')
 
     await startMonthWithIncome('3000')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "We couldn't start this month. Please try again.",
-    )
+    expect(await findToast('Month started')).toHaveAttribute('data-type', 'success')
+  })
+
+  it("shows the server's message when starting the month fails", async () => {
+    mockMonthsApi({ 'POST /months': databaseUnavailableResponse })
+    renderApp('/')
+
+    await startMonthWithIncome('3000')
+
+    expect(await findToast(DATABASE_UNAVAILABLE_MESSAGE)).toHaveAttribute('data-type', 'error')
+  })
+
+  it('keeps the typed income when starting the month fails', async () => {
+    mockMonthsApi({ 'POST /months': databaseUnavailableResponse })
+    renderApp('/')
+
+    await startMonthWithIncome('3000')
+
+    await findToast(DATABASE_UNAVAILABLE_MESSAGE)
+    expect(screen.getByLabelText('Income')).toHaveValue('3000')
+  })
+
+  it('shows no inline alert when starting the month fails', async () => {
+    mockMonthsApi({ 'POST /months': databaseUnavailableResponse })
+    renderApp('/')
+
+    await startMonthWithIncome('3000')
+
+    await findToast(DATABASE_UNAVAILABLE_MESSAGE)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('shows the month when it was already started elsewhere', async () => {
@@ -194,9 +224,8 @@ describe('DashboardPage', () => {
 
     answerAlreadyStarted()
 
-    // The button is back once the request has failed, in the same render as any alert.
     await screen.findByRole('button', { name: 'Start this month' })
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(await shownToasts()).toEqual([])
   })
 
   it('keeps showing the month when reloading the months fails', async () => {
@@ -273,6 +302,15 @@ describe('DashboardPage', () => {
     await screen.findByRole('alert')
 
     expect(monthDropdown()).toBeInTheDocument()
+  })
+
+  it('shows no toast when the months could not be loaded', async () => {
+    mockMonthsApi({ 'GET /months': internalErrorResponse })
+
+    renderApp('/')
+
+    await screen.findByRole('alert')
+    expect(await shownToasts()).toEqual([])
   })
 
   it('explains that the months could not be loaded', async () => {
@@ -426,15 +464,45 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
   })
 
-  it('explains that saving the income failed', async () => {
-    mockStartedMonthsApi({ 'PATCH /months/2026/9': internalErrorResponse })
+  it('confirms that the income was saved', async () => {
+    mockStartedMonthsApi()
     renderApp('/')
     await editIncome('3500.50')
 
     await userEvent.click(screen.getByRole('button', { name: 'Save income' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "We couldn't save the income. Please try again.",
-    )
+    expect(await findToast('Income saved')).toHaveAttribute('data-type', 'success')
+  })
+
+  it("shows the server's message when saving the income fails", async () => {
+    mockStartedMonthsApi({ 'PATCH /months/2026/9': databaseUnavailableResponse })
+    renderApp('/')
+    await editIncome('3500.50')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save income' }))
+
+    expect(await findToast(DATABASE_UNAVAILABLE_MESSAGE)).toHaveAttribute('data-type', 'error')
+  })
+
+  it('keeps the typed income when saving it fails', async () => {
+    mockStartedMonthsApi({ 'PATCH /months/2026/9': databaseUnavailableResponse })
+    renderApp('/')
+    await editIncome('3500.50')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save income' }))
+
+    await findToast(DATABASE_UNAVAILABLE_MESSAGE)
+    expect(screen.getByLabelText('Income')).toHaveValue('3500.50')
+  })
+
+  it('shows no inline alert when saving the income fails', async () => {
+    mockStartedMonthsApi({ 'PATCH /months/2026/9': databaseUnavailableResponse })
+    renderApp('/')
+    await editIncome('3500.50')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save income' }))
+
+    await findToast(DATABASE_UNAVAILABLE_MESSAGE)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

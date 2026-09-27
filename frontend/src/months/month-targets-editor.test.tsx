@@ -5,10 +5,11 @@ import type { BucketSummary, MonthSummary } from '@/summary/summary-api'
 import {
   type ApiResponder,
   inSequence,
-  internalErrorResponse,
   jsonResponse,
   mockApi,
+  DATABASE_UNAVAILABLE_MESSAGE,
   sentJsonBody,
+  databaseUnavailableResponse,
   signedInUser,
   signInBeforeRender,
   startedSeptember2026,
@@ -16,6 +17,7 @@ import {
   wasSent,
 } from '@/test/api-mock'
 import { renderApp } from '@/test/render-app'
+import { findToast } from '@/test/toasts'
 
 const adjustedSeptember2026: Month = {
   ...startedSeptember2026,
@@ -189,19 +191,50 @@ describe('MonthTargetsEditor', () => {
     expect(within(await monthPlanForm()).getByLabelText('Investments')).toHaveValue('15')
   })
 
-  it('explains that saving failed', async () => {
-    mockMonthTargetsApi({
-      'PUT /months/2026/9/targets': internalErrorResponse,
-    })
+  it('confirms that the targets were saved', async () => {
+    mockMonthTargetsApi()
     renderApp('/')
     await openMonthPlanForm()
     await moveFivePercentFromFixedCostsToInvestments()
 
     await saveMonthPlan()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "We couldn't save this month's plan. Please try again.",
-    )
+    expect(await findToast('Targets saved')).toHaveAttribute('data-type', 'success')
+  })
+
+  it("shows the server's message when saving fails", async () => {
+    mockMonthTargetsApi({ 'PUT /months/2026/9/targets': databaseUnavailableResponse })
+    renderApp('/')
+    await openMonthPlanForm()
+    await moveFivePercentFromFixedCostsToInvestments()
+
+    await saveMonthPlan()
+
+    expect(await findToast(DATABASE_UNAVAILABLE_MESSAGE)).toHaveAttribute('data-type', 'error')
+  })
+
+  it('keeps the typed percentages when saving fails', async () => {
+    mockMonthTargetsApi({ 'PUT /months/2026/9/targets': databaseUnavailableResponse })
+    renderApp('/')
+    await openMonthPlanForm()
+    await moveFivePercentFromFixedCostsToInvestments()
+
+    await saveMonthPlan()
+
+    await findToast(DATABASE_UNAVAILABLE_MESSAGE)
+    expect(within(await monthPlanForm()).getByLabelText('Investments')).toHaveValue('15')
+  })
+
+  it('shows no inline alert when saving fails', async () => {
+    mockMonthTargetsApi({ 'PUT /months/2026/9/targets': databaseUnavailableResponse })
+    renderApp('/')
+    await openMonthPlanForm()
+    await moveFivePercentFromFixedCostsToInvestments()
+
+    await saveMonthPlan()
+
+    await findToast(DATABASE_UNAVAILABLE_MESSAGE)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('closes the form when cancelled', async () => {

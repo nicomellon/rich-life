@@ -37,9 +37,7 @@ export async function setSpendingPlan(
     await page.getByLabel(bucket, { exact: true }).fill(typedPercentage)
   }
   await page.getByRole('button', { name: 'Save plan' }).click()
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Your spending plan is saved.' }),
-  ).toBeVisible()
+  await expect(page.getByText('Spending plan saved', { exact: true })).toBeVisible()
 }
 
 export async function startCurrentMonth(page: Page, typedMonthIncome: string) {
