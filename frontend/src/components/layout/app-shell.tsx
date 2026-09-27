@@ -16,8 +16,8 @@ export function AppShell() {
   return (
     <div className="flex min-h-svh flex-col">
       <header className="border-b">
-        <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-4">
-          <NavLink to="/" className="font-semibold tracking-tight">
+        <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4 sm:gap-6">
+          <NavLink to="/" className="font-semibold tracking-tight whitespace-nowrap">
             Rich Life
           </NavLink>
           <nav aria-label="Main" className="flex gap-1 text-sm">
@@ -28,7 +28,7 @@ export function AppShell() {
                 end={end}
                 className={({ isActive }) =>
                   cn(
-                    'rounded-md px-3 py-1.5 transition-colors hover:bg-accent',
+                    'rounded-md px-2 py-1.5 whitespace-nowrap transition-colors hover:bg-accent sm:px-3',
                     isActive ? 'bg-accent font-medium' : 'text-muted-foreground',
                   )
                 }
@@ -37,11 +37,15 @@ export function AppShell() {
               </NavLink>
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-3 text-sm">
-            <span className="text-muted-foreground">{currentUser?.email}</span>
-            <Button variant="ghost" size="sm" onClick={signOut}>
+          <div className="ml-auto flex min-w-0 items-center gap-3 text-sm">
+            {/* Phones only have room for the navigation: the email hides and Sign out becomes
+                an icon, named by its aria-label. */}
+            <span className="hidden min-w-0 truncate text-muted-foreground sm:inline">
+              {currentUser?.email}
+            </span>
+            <Button variant="ghost" size="sm" aria-label="Sign out" onClick={signOut}>
               <LogOut />
-              Sign out
+              <span className="hidden sm:inline">Sign out</span>
             </Button>
           </div>
         </div>

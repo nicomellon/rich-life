@@ -1,15 +1,14 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import {
+  addEntry,
+  PINNED_BROWSER_TIME,
+  registerWithPasskey,
+  setSpendingPlan,
+  startCurrentMonth,
+  type BucketLabel,
+  type TypedEntry,
+} from './app-steps'
 import { addVirtualAuthenticator } from './virtual-authenticator'
-
-/** A bucket's label in the UI, in display order. */
-type BucketLabel = 'Fixed Costs' | 'Investments' | 'Savings' | 'Guilt-Free Spending'
-
-/** An entry as the user types it into the add form. */
-interface TypedEntry {
-  bucket: BucketLabel
-  typedAmount: string
-  description: string
-}
 
 const typedPlanPercentages: Record<BucketLabel, string> = {
   'Fixed Costs': '40',
@@ -17,9 +16,6 @@ const typedPlanPercentages: Record<BucketLabel, string> = {
   Savings: '25',
   'Guilt-Free Spending': '20',
 }
-
-/** Mid-month, in the UTC time zone the config pins, so no time zone moves it to another month. */
-const PINNED_BROWSER_TIME = new Date('2026-09-15T12:00:00Z')
 
 const typedMonthIncome = '3000'
 
@@ -29,48 +25,6 @@ const typedEntries: TypedEntry[] = [
   { bucket: 'Savings', typedAmount: '600', description: 'Emergency fund' },
   { bucket: 'Guilt-Free Spending', typedAmount: '400', description: 'Concert tickets' },
 ]
-
-async function registerWithPasskey(page: Page) {
-  await page.goto('/register')
-  await page.getByLabel('Email').fill(`e2e-${crypto.randomUUID()}@example.com`)
-  await page.getByRole('button', { name: 'Create a passkey' }).click()
-  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
-}
-
-async function setSpendingPlan(page: Page) {
-  await page
-    .getByRole('navigation', { name: 'Main' })
-    .getByRole('link', { name: 'Spending plan' })
-    .click()
-  for (const [bucket, typedPercentage] of Object.entries(typedPlanPercentages)) {
-    await page.getByLabel(bucket, { exact: true }).fill(typedPercentage)
-  }
-  await page.getByRole('button', { name: 'Save plan' }).click()
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Your spending plan is saved.' }),
-  ).toBeVisible()
-}
-
-async function startCurrentMonth(page: Page) {
-  await page
-    .getByRole('navigation', { name: 'Main' })
-    .getByRole('link', { name: 'Dashboard' })
-    .click()
-  // Exact, as the plan page also has a "Monthly income (optional)" field.
-  await page.getByLabel('Income', { exact: true }).fill(typedMonthIncome)
-  await page.getByRole('button', { name: 'Start this month' }).click()
-  await expect(page.getByRole('button', { name: 'Edit income' })).toBeVisible()
-}
-
-async function addEntry(page: Page, typedEntry: TypedEntry) {
-  const addEntryForm = page.getByRole('form', { name: 'Add an entry' })
-  await addEntryForm.getByLabel('Amount').fill(typedEntry.typedAmount)
-  await addEntryForm.getByLabel('Bucket').selectOption({ label: typedEntry.bucket })
-  await addEntryForm.getByLabel('Description (optional)').fill(typedEntry.description)
-  await addEntryForm.getByRole('button', { name: 'Add entry' }).click()
-  const bucketEntries = page.getByRole('region', { name: typedEntry.bucket })
-  await expect(bucketEntries.getByText(typedEntry.description, { exact: true })).toBeVisible()
-}
 
 /** Each bucket card's target or actual amount, in display order. */
 function bucketCardAmounts(page: Page, term: 'Target' | 'Actual'): Locator {
@@ -95,8 +49,8 @@ test.describe('a month planned and tracked from registration', () => {
     await dashboardPage.clock.setFixedTime(PINNED_BROWSER_TIME)
     await addVirtualAuthenticator(dashboardPage)
     await registerWithPasskey(dashboardPage)
-    await setSpendingPlan(dashboardPage)
-    await startCurrentMonth(dashboardPage)
+    await setSpendingPlan(dashboardPage, typedPlanPercentages)
+    await startCurrentMonth(dashboardPage, typedMonthIncome)
 
     for (const typedEntry of typedEntries) await addEntry(dashboardPage, typedEntry)
   })
