@@ -5,6 +5,7 @@ import type { BucketSummary, MonthSummary } from '@/summary/summary-api'
 import {
   type ApiResponder,
   inSequence,
+  internalErrorResponse,
   jsonResponse,
   mockApi,
   sentJsonBody,
@@ -190,7 +191,7 @@ describe('MonthTargetsEditor', () => {
 
   it('explains that saving failed', async () => {
     mockMonthTargetsApi({
-      'PUT /months/2026/9/targets': () => jsonResponse({ detail: 'Internal Server Error' }, 500),
+      'PUT /months/2026/9/targets': internalErrorResponse,
     })
     renderApp('/')
     await openMonthPlanForm()

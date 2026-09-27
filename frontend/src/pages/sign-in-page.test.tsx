@@ -8,6 +8,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { getAccessToken } from '@/lib/auth-token'
 import {
+  errorResponse,
   issuedAccessToken,
   jsonResponse,
   mockApi,
@@ -124,7 +125,9 @@ describe('SignInPage', () => {
   })
 
   it('explains that the backend rejected the passkey', async () => {
-    mockSignInApi(() => jsonResponse({ detail: 'Passkey verification failed' }, 401))
+    mockSignInApi(() =>
+      errorResponse(401, 'passkey_verification_failed', 'Passkey verification failed'),
+    )
     renderApp('/sign-in')
 
     await clickSignIn()

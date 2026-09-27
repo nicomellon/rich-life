@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { monthsQueryKey, type Month } from '@/months/months-api'
 import {
   type ApiResponder,
+  errorResponse,
   inSequence,
+  internalErrorResponse,
   jsonResponse,
   mockApi,
   neverRespond,
@@ -18,7 +20,6 @@ import { createTestQueryClient, renderApp } from '@/test/render-app'
 
 const startedJuly2026: Month = { ...startedSeptember2026, month: 7, income: '2800.00' }
 const updatedSeptember2026: Month = { ...startedSeptember2026, income: '3500.50' }
-const respondWithServerError = () => jsonResponse({ detail: 'Internal Server Error' }, 500)
 const welcomeLine = "Welcome to Rich Life. Start your first month by entering this month's income."
 
 function mockMonthsApi(extraResponders: Record<string, ApiResponder> = {}) {
@@ -153,7 +154,7 @@ describe('DashboardPage', () => {
   })
 
   it('explains that starting the month failed', async () => {
-    mockMonthsApi({ 'POST /months': respondWithServerError })
+    mockMonthsApi({ 'POST /months': internalErrorResponse })
     renderApp('/')
 
     await startMonthWithIncome('3000')
@@ -169,7 +170,7 @@ describe('DashboardPage', () => {
         () => jsonResponse([]),
         () => jsonResponse([startedSeptember2026]),
       ),
-      'POST /months': () => jsonResponse({ detail: 'Month already exists' }, 409),
+      'POST /months': () => errorResponse(409, 'month_already_exists', 'Month already exists'),
     })
     renderApp('/')
 
@@ -184,7 +185,7 @@ describe('DashboardPage', () => {
       'POST /months': () =>
         new Promise<Response>((resolve) => {
           answerAlreadyStarted = () =>
-            resolve(jsonResponse({ detail: 'Month already exists' }, 409))
+            resolve(errorResponse(409, 'month_already_exists', 'Month already exists'))
         }),
     })
     renderApp('/')
@@ -200,7 +201,7 @@ describe('DashboardPage', () => {
 
   it('keeps showing the month when reloading the months fails', async () => {
     mockStartedMonthsApi({
-      'GET /months': inSequence(() => jsonResponse([startedSeptember2026]), respondWithServerError),
+      'GET /months': inSequence(() => jsonResponse([startedSeptember2026]), internalErrorResponse),
     })
     const queryClient = createTestQueryClient()
     renderApp('/', queryClient)
@@ -257,7 +258,7 @@ describe('DashboardPage', () => {
   })
 
   it('removes the skeleton when the months could not be loaded', async () => {
-    mockMonthsApi({ 'GET /months': respondWithServerError })
+    mockMonthsApi({ 'GET /months': internalErrorResponse })
     renderApp('/')
 
     await screen.findByRole('alert')
@@ -266,7 +267,7 @@ describe('DashboardPage', () => {
   })
 
   it('shows the month picker when the months could not be loaded', async () => {
-    mockMonthsApi({ 'GET /months': respondWithServerError })
+    mockMonthsApi({ 'GET /months': internalErrorResponse })
     renderApp('/')
 
     await screen.findByRole('alert')
@@ -275,7 +276,7 @@ describe('DashboardPage', () => {
   })
 
   it('explains that the months could not be loaded', async () => {
-    mockMonthsApi({ 'GET /months': respondWithServerError })
+    mockMonthsApi({ 'GET /months': internalErrorResponse })
 
     renderApp('/')
 
@@ -426,7 +427,7 @@ describe('DashboardPage', () => {
   })
 
   it('explains that saving the income failed', async () => {
-    mockStartedMonthsApi({ 'PATCH /months/2026/9': respondWithServerError })
+    mockStartedMonthsApi({ 'PATCH /months/2026/9': internalErrorResponse })
     renderApp('/')
     await editIncome('3500.50')
 

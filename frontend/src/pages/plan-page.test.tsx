@@ -4,6 +4,7 @@ import type { SpendingPlanPercentages } from '@/spending-plan/spending-plan-api'
 import {
   type ApiResponder,
   defaultSpendingPlan,
+  internalErrorResponse,
   jsonResponse,
   mockApi,
   neverRespond,
@@ -153,7 +154,7 @@ describe('PlanPage', () => {
   })
 
   it('explains that saving failed', async () => {
-    mockSpendingPlanApi(() => jsonResponse({ detail: 'Internal Server Error' }, 500))
+    mockSpendingPlanApi(internalErrorResponse)
     renderApp('/plan')
     await moveFivePercentFromFixedCostsToInvestments()
 
@@ -182,7 +183,7 @@ describe('PlanPage', () => {
   })
 
   it('removes the skeleton when the plan could not be loaded', async () => {
-    mockSpendingPlanApi(undefined, () => jsonResponse({ detail: 'Internal Server Error' }, 500))
+    mockSpendingPlanApi(undefined, internalErrorResponse)
     renderApp('/plan')
 
     await screen.findByRole('alert')
@@ -191,7 +192,7 @@ describe('PlanPage', () => {
   })
 
   it('explains that the plan could not be loaded', async () => {
-    mockSpendingPlanApi(undefined, () => jsonResponse({ detail: 'Internal Server Error' }, 500))
+    mockSpendingPlanApi(undefined, internalErrorResponse)
 
     renderApp('/plan')
 

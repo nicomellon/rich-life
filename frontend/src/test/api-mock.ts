@@ -1,5 +1,6 @@
 import type { AccessToken, User } from '@/auth/auth-api'
 import type { Entry } from '@/entries/entries-api'
+import type { ErrorResponseBody, FieldError } from '@/lib/api'
 import { setAccessToken } from '@/lib/auth-token'
 import type { Month } from '@/months/months-api'
 import { BUCKETS, type Bucket } from '@/spending-plan/buckets'
@@ -14,6 +15,22 @@ export function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json' },
   })
+}
+
+/** An error response in the backend's format; only 422s have `fields`. */
+export function errorResponse(
+  status: number,
+  code: ErrorResponseBody['code'],
+  detail: string,
+  fields?: FieldError[],
+): Response {
+  const errorBody: ErrorResponseBody = fields ? { detail, code, fields } : { detail, code }
+  return jsonResponse(errorBody, status)
+}
+
+/** The backend's answer to a request that failed on its side. */
+export function internalErrorResponse(): Response {
+  return errorResponse(500, 'internal_error', 'Something went wrong. Please try again.')
 }
 
 /** Answers each request with the next responder, repeating the last one. */

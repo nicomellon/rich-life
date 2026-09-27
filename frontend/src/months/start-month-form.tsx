@@ -65,5 +65,5 @@ export function StartMonthForm({ calendarMonth }: StartMonthFormProps) {
 }
 
 function isAlreadyStartedError(startError: Error): boolean {
-  return startError instanceof ApiError && startError.status === 409
+  return startError instanceof ApiError && startError.code === 'month_already_exists'
 }
