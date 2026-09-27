@@ -121,8 +121,28 @@ Derived per month (computed on the fly, not stored): for each bucket, `target_am
 
 ## Milestone 4 — Polish and release
 
-**#17 Error handling and UX polish**
-- One consistent API error format, toast notifications, loading skeletons, empty states, form validation with zod + react-hook-form, and a responsive layout.
+#17 (error handling and UX polish) was split into #45 to #51.
+
+**#45 Consistent API error format**
+- Every API error returns the same body: a human-readable `detail`, a machine-readable `code`, and per-field `fields` on 422s. Unhandled errors return the same shape with a generic message.
+
+**#46 Typed API errors in the frontend client** — depends on #45
+- The API client reads errors into a typed `ApiError` with `status`, `code`, `message` and field errors, so components show the server's message and branch on `code` rather than on HTTP statuses.
+
+**#47 Toast notifications** — depends on #46, #19
+- Success toasts after each save, and error toasts for server and network failures, in place of the inline error paragraphs. Validation, page-load and passkey errors stay inline.
+
+**#48 Forms on zod and react-hook-form** — depends on #46, #47, #19
+- Every form uses a zod schema that mirrors the backend's limits. Errors show after the first submit, and server-side field errors appear under their fields.
+
+**#49 Loading skeletons** — depends on #19
+- Skeletons shaped like the content replace the "Loading…" text on the dashboard, summary, entries list and plan page.
+
+**#50 Dashboard empty states** — depends on #19
+- A welcome for users with no months, a prompt when a month has no entries, and a hint when a month's income is 0.
+
+**#51 Responsive layout** — depends on #19
+- Every page fits a 375px-wide screen without horizontal scrolling. Below 640px the header hides the email and shows an icon-only "Sign out".
 
 **#18 Seed data for a user**
 - `python -m app.scripts.seed --email you@example.com` adds 3 months of example data to an existing account. With passkeys there is no demo password to share, so register an account in the app first and seed it.
@@ -145,7 +165,7 @@ Until this milestone ships, a user who loses every device holding their passkey 
 - A signed-in user can add another passkey: `register-challenge` and `verify-registration` called with a bearer token add a passkey to the current account instead of creating one.
 - AC: a valid link signs the user in exactly once; expired, reused or unknown tokens return 401; unknown emails get the same 202 as known ones; the rate limit is enforced; and all of this is tested with a fake email sender.
 
-**#30 Magic-link sign-in UI** — depends on #7, #29
+**#30 Magic-link sign-in UI** — depends on #7, #29, #48
 - An "Email me a sign-in link" option on the sign-in page, a confirmation screen, and a landing route for the link that verifies the token and signs the user in. After signing in by link, offer to create a passkey on this device.
 - AC: a user without a passkey on this device can request a link, follow it to get signed in, and add a passkey.
 
