@@ -159,7 +159,7 @@ def test_create_a_duplicate_month_returns_409(
 
     assert (response.status_code, response.json()) == (
         409,
-        {"detail": "Month already exists"},
+        {"detail": "Month already exists", "code": "month_already_exists"},
     )
 
 
@@ -301,7 +301,7 @@ def test_month_that_does_not_exist_returns_404(
 
     assert (response.status_code, response.json()) == (
         404,
-        {"detail": "Month not found"},
+        {"detail": "Month not found", "code": "month_not_found"},
     )
 
 

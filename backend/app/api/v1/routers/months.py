@@ -1,12 +1,24 @@
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Response, status
 
 from app.api.deps import CurrentUser, DbSession, RequestedMonth
+from app.api.errors import (
+    MONTH_ALREADY_EXISTS,
+    MONTH_NOT_FOUND,
+    NOT_AUTHENTICATED,
+    VALIDATION_FAILED,
+    ApiError,
+    error_responses,
+)
 from app.schemas.month import MonthCreate, MonthRead, MonthUpdate
 from app.schemas.spending_plan import SpendingPlanPercentages
 from app.schemas.summary import MonthSummary
 from app.services import entries, months, summary
 
-router = APIRouter(prefix="/months", tags=["months"])
+router = APIRouter(
+    prefix="/months",
+    tags=["months"],
+    responses=error_responses(NOT_AUTHENTICATED),
+)
 
 
 @router.get("", summary="List the months")
@@ -19,7 +31,7 @@ def list_months(user: CurrentUser, db: DbSession) -> list[MonthRead]:
     "",
     status_code=status.HTTP_201_CREATED,
     summary="Start a month",
-    responses={status.HTTP_409_CONFLICT: {"description": "Month already exists"}},
+    responses=error_responses(MONTH_ALREADY_EXISTS, VALIDATION_FAILED),
 )
 def create_month(new_month: MonthCreate, user: CurrentUser, db: DbSession) -> MonthRead:
     """Its targets are copied from the current spending plan, so later changes to the
@@ -27,16 +39,14 @@ def create_month(new_month: MonthCreate, user: CurrentUser, db: DbSession) -> Mo
     try:
         created_month = months.create_month(db, user, new_month)
     except months.MonthAlreadyExistsError:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT, detail="Month already exists"
-        ) from None
+        raise ApiError(MONTH_ALREADY_EXISTS) from None
     return MonthRead.model_validate(created_month)
 
 
 @router.get(
     "/{year}/{month}",
     summary="Get a month",
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Month not found"}},
+    responses=error_responses(MONTH_NOT_FOUND, VALIDATION_FAILED),
 )
 def read_month(requested_month: RequestedMonth) -> MonthRead:
     return MonthRead.model_validate(requested_month)
@@ -45,7 +55,7 @@ def read_month(requested_month: RequestedMonth) -> MonthRead:
 @router.patch(
     "/{year}/{month}",
     summary="Change a month's income",
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Month not found"}},
+    responses=error_responses(MONTH_NOT_FOUND, VALIDATION_FAILED),
 )
 def update_month(
     month_update: MonthUpdate, requested_month: RequestedMonth, db: DbSession
@@ -58,7 +68,7 @@ def update_month(
 @router.put(
     "/{year}/{month}/targets",
     summary="Replace a month's targets",
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Month not found"}},
+    responses=error_responses(MONTH_NOT_FOUND, VALIDATION_FAILED),
 )
 def update_month_targets(
     new_targets: SpendingPlanPercentages,
@@ -78,7 +88,7 @@ def update_month_targets(
 @router.get(
     "/{year}/{month}/summary",
     summary="Summarize a month",
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Month not found"}},
+    responses=error_responses(MONTH_NOT_FOUND, VALIDATION_FAILED),
 )
 def read_month_summary(
     requested_month: RequestedMonth, user: CurrentUser, db: DbSession
@@ -97,7 +107,7 @@ def read_month_summary(
     "/{year}/{month}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a month",
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Month not found"}},
+    responses=error_responses(MONTH_NOT_FOUND, VALIDATION_FAILED),
 )
 def delete_month(requested_month: RequestedMonth, db: DbSession) -> Response:
     db.delete(requested_month)
