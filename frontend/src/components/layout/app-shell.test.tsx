@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { getAccessToken } from '@/lib/auth-token'
 import {
@@ -60,6 +60,15 @@ describe('AppShell', () => {
     renderApp('/')
 
     expect(await screen.findByText('ada@example.com')).toBeInTheDocument()
+  })
+
+  it("keeps the sign-out button's name when its text is hidden, as on phones", async () => {
+    renderApp('/')
+    const signOutButton = await screen.findByRole('button', { name: 'Sign out' })
+
+    within(signOutButton).getByText('Sign out').style.display = 'none'
+
+    expect(signOutButton).toHaveAccessibleName('Sign out')
   })
 
   it('signing out goes to the sign-in page', async () => {

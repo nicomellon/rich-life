@@ -120,14 +120,15 @@ export function EntryRow({ entry, calendarMonth, formatAmount }: EntryRowProps) 
   }
 
   return (
-    <li className="flex items-center gap-3 py-2">
+    // On phones the description gets a line of its own, above the date, amount and buttons.
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
       <span className="w-16 shrink-0 text-sm text-muted-foreground">
         {formatEntryDate(entry.date)}
       </span>
-      <span className="min-w-0 flex-1 truncate">
+      <span className="min-w-0 flex-1 truncate max-sm:order-first max-sm:basis-full">
         {entry.description || <span className="text-muted-foreground">No description</span>}
       </span>
-      <span className="font-medium tabular-nums">{formattedAmount}</span>
+      <span className="font-medium tabular-nums max-sm:ml-auto">{formattedAmount}</span>
       <Button
         variant="ghost"
         size="icon-sm"
