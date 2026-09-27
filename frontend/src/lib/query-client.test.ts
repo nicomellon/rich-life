@@ -1,4 +1,4 @@
-import { ApiError } from '@/lib/api'
+import { ApiError, NETWORK_ERROR_MESSAGE } from '@/lib/api'
 import { createQueryClient } from '@/lib/query-client'
 
 /** Whether the app's query client retries a query whose first attempt failed with `error`. */
@@ -13,7 +13,7 @@ describe('createQueryClient', () => {
     const networkError = new ApiError({
       status: 0,
       code: 'network_error',
-      message: "Couldn't reach the server. Check your connection and try again.",
+      message: NETWORK_ERROR_MESSAGE,
     })
 
     expect(retriesFirstFailure(networkError)).toBe(true)
