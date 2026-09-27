@@ -183,6 +183,15 @@ describe('MonthEntries', () => {
     expect(await findLoadingSkeleton('Loading your entries…')).toBeInTheDocument()
   })
 
+  it('does not say the month has no entries while the entries are loading', async () => {
+    mockEntriesApi({ 'GET /months/2026/9/entries': neverRespond })
+    renderApp('/')
+
+    await findLoadingSkeleton('Loading your entries…')
+
+    expect(screen.queryByText(noEntriesMessage)).not.toBeInTheDocument()
+  })
+
   it('replaces the skeleton with the entries once they are loaded', async () => {
     mockEntriesApi()
     renderApp('/')

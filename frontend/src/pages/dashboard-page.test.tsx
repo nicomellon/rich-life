@@ -238,6 +238,15 @@ describe('DashboardPage', () => {
     expect(screen.queryByRole('combobox', { name: 'Month' })).not.toBeInTheDocument()
   })
 
+  it('does not welcome the user while the months are loading', async () => {
+    mockMonthsApi({ 'GET /months': neverRespond })
+    renderApp('/')
+
+    await findLoadingSkeleton('Loading your months…')
+
+    expect(screen.queryByText(welcomeLine)).not.toBeInTheDocument()
+  })
+
   it('replaces the skeleton with the month once the months are loaded', async () => {
     mockMonthsApi()
     renderApp('/')
