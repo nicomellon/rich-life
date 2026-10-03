@@ -1,4 +1,4 @@
-# Local development services. Start the database with:  docker compose up -d db
+# Local development services. Start the database and Redis with:  docker compose up -d db redis
 name: rich-life
 
 services:
@@ -15,6 +15,19 @@ services:
       - db-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Holds the magic-link tokens and the rate-limit counters, which only need to outlive
+  # a few minutes, so nothing is persisted.
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10

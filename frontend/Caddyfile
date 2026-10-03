@@ -5,6 +5,26 @@
 #                 for a local trial; :80 serves plain HTTP behind a platform that
 #                 terminates TLS itself. Default: :80.
 #   API_UPSTREAM  Address of the backend. Default: backend:8000, the compose service.
+#   TRUSTED_PROXIES
+#                 Space-separated IP ranges of the proxies in front of Caddy, whose
+#                 CLIENT_IP_HEADER is believed; `private_ranges` covers a platform's
+#                 private network. Default: 127.0.0.1/32, i.e. none on a server that
+#                 faces the internet itself, where the client is the connection's peer.
+#   CLIENT_IP_HEADER
+#                 The header a trusted proxy puts the client's IP in, e.g.
+#                 Fly-Client-IP on Fly.io. Default: X-Forwarded-For.
+
+{
+	servers {
+		# The backend rate-limits by client IP, so Caddy works out the real one: from
+		# CLIENT_IP_HEADER when the request comes through a trusted proxy, otherwise the
+		# connection's own address. Strict mode reads X-Forwarded-For from the right, so
+		# entries a client adds on the left are never believed.
+		trusted_proxies static {$TRUSTED_PROXIES:127.0.0.1/32}
+		trusted_proxies_strict
+		client_ip_headers {$CLIENT_IP_HEADER:X-Forwarded-For}
+	}
+}
 
 {$SITE_ADDRESS::80} {
 	encode zstd gzip
@@ -19,7 +39,11 @@
 	}
 
 	handle /api/* {
-		reverse_proxy {$API_UPSTREAM:backend:8000}
+		reverse_proxy {$API_UPSTREAM:backend:8000} {
+			# Replaces whatever the client sent with the one address resolved above, so
+			# uvicorn's --proxy-headers reads exactly that.
+			header_up X-Forwarded-For {client_ip}
+		}
 	}
 
 	# Vite fingerprints everything under /assets, so a file never changes under its name
