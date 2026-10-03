@@ -85,7 +85,8 @@ def headers_of_a_user_without_a_plan(
     db: Session, signed_in_headers: dict[str, str]
 ) -> dict[str, str]:
     """A signed-in user whose plan row is missing, e.g. deleted by hand."""
-    db.execute(delete(SpendingPlan))
+    user_id = db.scalars(select(User.id).where(User.email == EMAIL)).one()
+    db.execute(delete(SpendingPlan).where(SpendingPlan.user_id == user_id))
     return signed_in_headers
 
 
