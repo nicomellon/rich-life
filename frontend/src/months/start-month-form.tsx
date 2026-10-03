@@ -1,11 +1,19 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useForm } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api'
-import { parseAmountInCents, toApiAmount } from '@/lib/money'
-import { showSaveFailedToast, showSavedToast } from '@/lib/save-toasts'
+import { showSaveError } from '@/lib/form-errors'
+import { toApiAmount } from '@/lib/money'
+import { showSavedToast } from '@/lib/save-toasts'
 import { formatCalendarMonth, type CalendarMonth } from '@/months/calendar-month'
 import { IncomeField } from '@/months/income-field'
+import {
+  INCOME_FORM_FIELDS,
+  incomeSchema,
+  type TypedIncome,
+  type ValidIncome,
+} from '@/months/income-schema'
 import { createMonth, monthsQueryKey, storeSavedMonth } from '@/months/months-api'
 
 interface StartMonthFormProps {
@@ -16,28 +24,36 @@ interface StartMonthFormProps {
 /** The empty state of a month the user hasn't started: a form that starts it with an income. */
 export function StartMonthForm({ calendarMonth }: StartMonthFormProps) {
   const queryClient = useQueryClient()
-  const [typedIncome, setTypedIncome] = useState('')
-  const incomeInCents = parseAmountInCents(typedIncome)
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm<TypedIncome, unknown, ValidIncome>({
+    resolver: zodResolver(incomeSchema),
+    mode: 'onSubmit',
+    reValidateMode: 'onChange',
+    defaultValues: { income: '' },
+  })
   const startMutation = useMutation({
     mutationFn: createMonth,
     onSuccess: (createdMonth) => {
       showSavedToast('Month started')
       return storeSavedMonth(queryClient, createdMonth)
     },
-    onError: (startError) => {
+  })
+
+  async function startMonth({ income }: ValidIncome) {
+    try {
+      await startMutation.mutateAsync({ ...calendarMonth, income: toApiAmount(income) })
+    } catch (startError) {
       // Started meanwhile, e.g. in another tab: loading the months shows it.
       if (isAlreadyStartedError(startError)) {
         void queryClient.invalidateQueries({ queryKey: monthsQueryKey })
       } else {
-        showSaveFailedToast(startError)
+        showSaveError(startError, INCOME_FORM_FIELDS, setError)
       }
-    },
-  })
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (incomeInCents === null) return
-    startMutation.mutate({ ...calendarMonth, income: toApiAmount(incomeInCents) })
+    }
   }
 
   return (
@@ -50,14 +66,18 @@ export function StartMonthForm({ calendarMonth }: StartMonthFormProps) {
           Enter this month's income. Its targets are copied from your spending plan.
         </p>
       </div>
-      <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+      <form
+        className="space-y-4"
+        onSubmit={(submitEvent) => void handleSubmit(startMonth)(submitEvent)}
+        noValidate
+      >
         <IncomeField
           id="new-month-income"
           label="Income"
-          typedIncome={typedIncome}
-          onChange={setTypedIncome}
+          incomeRegistration={register('income')}
+          errorMessage={errors.income?.message}
         />
-        <Button type="submit" disabled={incomeInCents === null || startMutation.isPending}>
+        <Button type="submit" disabled={startMutation.isPending}>
           {startMutation.isPending ? 'Starting…' : 'Start this month'}
         </Button>
       </form>
@@ -65,6 +85,6 @@ export function StartMonthForm({ calendarMonth }: StartMonthFormProps) {
   )
 }
 
-function isAlreadyStartedError(startError: Error): boolean {
+function isAlreadyStartedError(startError: unknown): boolean {
   return startError instanceof ApiError && startError.code === 'month_already_exists'
 }

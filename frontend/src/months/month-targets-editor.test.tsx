@@ -4,6 +4,7 @@ import type { Month } from '@/months/months-api'
 import type { BucketSummary, MonthSummary } from '@/summary/summary-api'
 import {
   type ApiResponder,
+  errorResponse,
   inSequence,
   jsonResponse,
   mockApi,
@@ -17,7 +18,7 @@ import {
   wasSent,
 } from '@/test/api-mock'
 import { renderApp } from '@/test/render-app'
-import { findToast } from '@/test/toasts'
+import { findToast, shownToasts } from '@/test/toasts'
 
 const adjustedSeptember2026: Month = {
   ...startedSeptember2026,
@@ -44,6 +45,14 @@ const summaryOfAdjustedMonth: MonthSummary = {
     }
     return bucketSummary
   }),
+}
+
+const SERVER_PERCENTAGE_ERROR_MESSAGE = 'Input should be less than or equal to 100'
+
+function savingsRejectedResponse(): Response {
+  return errorResponse(422, 'validation_failed', 'Some fields are invalid.', [
+    { field: 'savings_pct', message: SERVER_PERCENTAGE_ERROR_MESSAGE },
+  ])
 }
 
 function mockMonthTargetsApi(extraResponders: Record<string, ApiResponder> = {}) {
@@ -115,14 +124,16 @@ describe('MonthTargetsEditor', () => {
     expect(within(await monthPlanForm()).getByText('€1,500.00')).toBeInTheDocument()
   })
 
-  it("can't be saved when the total isn't 100%", async () => {
-    mockMonthTargetsApi()
+  it("does not save the month's percentages when they don't add up to 100%", async () => {
+    const fetchMock = mockMonthTargetsApi()
     renderApp('/')
     await openMonthPlanForm()
-
     await typePercentage('Savings', '30')
 
-    expect(screen.getByRole('button', { name: "Save this month's plan" })).toBeDisabled()
+    await saveMonthPlan()
+
+    await screen.findByText('The percentages must add up to 100%.')
+    expect(wasSent(fetchMock, 'PUT /months/2026/9/targets')).toBe(false)
   })
 
   it("sends the new percentages to the month's targets", async () => {
@@ -211,6 +222,31 @@ describe('MonthTargetsEditor', () => {
     await saveMonthPlan()
 
     expect(await findToast(DATABASE_UNAVAILABLE_MESSAGE)).toHaveAttribute('data-type', 'error')
+  })
+
+  it("shows the server's error about a percentage under its field", async () => {
+    mockMonthTargetsApi({ 'PUT /months/2026/9/targets': savingsRejectedResponse })
+    renderApp('/')
+    await openMonthPlanForm()
+    await moveFivePercentFromFixedCostsToInvestments()
+
+    await saveMonthPlan()
+
+    expect(
+      await within(await monthPlanForm()).findByText(SERVER_PERCENTAGE_ERROR_MESSAGE),
+    ).toBeInTheDocument()
+  })
+
+  it("shows no toast for the server's error about a percentage", async () => {
+    mockMonthTargetsApi({ 'PUT /months/2026/9/targets': savingsRejectedResponse })
+    renderApp('/')
+    await openMonthPlanForm()
+    await moveFivePercentFromFixedCostsToInvestments()
+
+    await saveMonthPlan()
+
+    await screen.findByText(SERVER_PERCENTAGE_ERROR_MESSAGE)
+    expect(await shownToasts()).toEqual([])
   })
 
   it('keeps the typed percentages when saving fails', async () => {

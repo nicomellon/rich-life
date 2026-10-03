@@ -1,9 +1,10 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { SpendingPlanPercentages } from '@/spending-plan/spending-plan-api'
 import {
   type ApiResponder,
   defaultSpendingPlan,
+  errorResponse,
   internalErrorResponse,
   jsonResponse,
   mockApi,
@@ -13,16 +14,26 @@ import {
   databaseUnavailableResponse,
   signedInUser,
   signInBeforeRender,
+  wasSent,
 } from '@/test/api-mock'
 import { findLoadingSkeleton } from '@/test/loading-skeleton'
 import { renderApp } from '@/test/render-app'
-import { findToast } from '@/test/toasts'
+import { findToast, shownToasts } from '@/test/toasts'
 
 const updatedSpendingPlan: SpendingPlanPercentages = {
   fixed_costs_pct: '45.00',
   investments_pct: '15.00',
   savings_pct: '20.00',
   guilt_free_pct: '20.00',
+}
+
+const PERCENTAGES_TOTAL_ERROR = 'The percentages must add up to 100%.'
+const SERVER_PERCENTAGE_ERROR_MESSAGE = 'Input should be less than or equal to 100'
+
+function savingsRejectedResponse(): Response {
+  return errorResponse(422, 'validation_failed', 'Some fields are invalid.', [
+    { field: 'savings_pct', message: SERVER_PERCENTAGE_ERROR_MESSAGE },
+  ])
 }
 
 function mockSpendingPlanApi(
@@ -44,6 +55,10 @@ async function typePercentage(bucketLabel: string, typedPercentage: string) {
   const percentageInput = await findPercentageInput(bucketLabel)
   await userEvent.clear(percentageInput)
   if (typedPercentage) await userEvent.type(percentageInput, typedPercentage)
+}
+
+async function savePlan() {
+  await userEvent.click(screen.getByRole('button', { name: 'Save plan' }))
 }
 
 async function moveFivePercentFromFixedCostsToInvestments() {
@@ -100,27 +115,130 @@ describe('PlanPage', () => {
     )
   })
 
-  it.each([
-    ["the total isn't 100%", '30'],
-    ['a percentage is empty', ''],
-  ])("can't be saved when %s", async (_, typedSavingsPercentage) => {
-    mockSpendingPlanApi()
-    renderApp('/plan')
-
-    await typePercentage('Savings', typedSavingsPercentage)
-
-    expect(screen.getByRole('button', { name: 'Save plan' })).toBeDisabled()
-  })
-
-  it('flags a percentage that is out of range', async () => {
+  it('shows no percentage error before the plan is first saved', async () => {
     mockSpendingPlanApi()
     renderApp('/plan')
 
     await typePercentage('Savings', '120')
 
+    expect(screen.getByLabelText('Savings')).not.toHaveAccessibleDescription()
+  })
+
+  it.each([
+    ['above 100', '120'],
+    ['empty', ''],
+    ['negative', '-5'],
+    ['with 3 decimal places', '12.345'],
+  ])('flags a percentage that is %s on save', async (_, typedSavingsPercentage) => {
+    mockSpendingPlanApi()
+    renderApp('/plan')
+    await typePercentage('Savings', typedSavingsPercentage)
+
+    await savePlan()
+
     expect(screen.getByLabelText('Savings')).toHaveAccessibleDescription(
       'Enter a number from 0 to 100, with at most 2 decimals.',
     )
+  })
+
+  it('marks an invalid percentage as invalid on save', async () => {
+    mockSpendingPlanApi()
+    renderApp('/plan')
+    await typePercentage('Savings', '120')
+
+    await savePlan()
+
+    expect(screen.getByLabelText('Savings')).toBeInvalid()
+  })
+
+  it('clears a percentage error as the user corrects it', async () => {
+    mockSpendingPlanApi()
+    renderApp('/plan')
+    await typePercentage('Savings', '120')
+    await savePlan()
+
+    await typePercentage('Savings', '20')
+
+    expect(screen.getByLabelText('Savings')).not.toHaveAccessibleDescription()
+  })
+
+  it('shows the total error once when the percentages add up to 99.99%', async () => {
+    mockSpendingPlanApi()
+    renderApp('/plan')
+    await typePercentage('Savings', '19.99')
+
+    await savePlan()
+
+    expect(await screen.findAllByText(PERCENTAGES_TOTAL_ERROR)).toHaveLength(1)
+  })
+
+  it('does not save percentages that add up to 99.99%', async () => {
+    const fetchMock = mockSpendingPlanApi()
+    renderApp('/plan')
+    await typePercentage('Savings', '19.99')
+
+    await savePlan()
+
+    await screen.findByText(PERCENTAGES_TOTAL_ERROR)
+    expect(wasSent(fetchMock, 'PUT /spending-plan')).toBe(false)
+  })
+
+  it('clears the total error as the user corrects a percentage', async () => {
+    mockSpendingPlanApi()
+    renderApp('/plan')
+    await typePercentage('Savings', '19.99')
+    await savePlan()
+    await screen.findByText(PERCENTAGES_TOTAL_ERROR)
+
+    await typePercentage('Savings', '20')
+
+    await waitFor(() => expect(screen.queryByText(PERCENTAGES_TOTAL_ERROR)).not.toBeInTheDocument())
+  })
+
+  it('keeps the save button enabled while the plan is invalid', async () => {
+    mockSpendingPlanApi()
+    renderApp('/plan')
+    await typePercentage('Savings', '30')
+
+    await savePlan()
+
+    await screen.findByText(PERCENTAGES_TOTAL_ERROR)
+    expect(screen.getByRole('button', { name: 'Save plan' })).toBeEnabled()
+  })
+
+  it("shows the server's error about a percentage under its field", async () => {
+    mockSpendingPlanApi(savingsRejectedResponse)
+    renderApp('/plan')
+    await moveFivePercentFromFixedCostsToInvestments()
+
+    await savePlan()
+
+    expect(await screen.findByText(SERVER_PERCENTAGE_ERROR_MESSAGE)).toBeInTheDocument()
+  })
+
+  it("keeps the server's error about Savings while the user changes Fixed Costs", async () => {
+    mockSpendingPlanApi(savingsRejectedResponse)
+    renderApp('/plan')
+    await moveFivePercentFromFixedCostsToInvestments()
+    await savePlan()
+    await screen.findByText(SERVER_PERCENTAGE_ERROR_MESSAGE)
+
+    await typePercentage('Fixed Costs', '44')
+
+    expect(screen.getByLabelText('Savings')).toHaveAccessibleDescription(
+      SERVER_PERCENTAGE_ERROR_MESSAGE,
+    )
+  })
+
+  it("shows no toast for the server's error about a percentage", async () => {
+    mockSpendingPlanApi(savingsRejectedResponse)
+    renderApp('/plan')
+    await moveFivePercentFromFixedCostsToInvestments()
+
+    await savePlan()
+
+    await screen.findByText(SERVER_PERCENTAGE_ERROR_MESSAGE)
+    expect(await shownToasts()).toEqual([])
   })
 
   it('sends the new percentages to the API', async () => {

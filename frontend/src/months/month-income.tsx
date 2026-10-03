@@ -1,11 +1,20 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Pencil } from 'lucide-react'
-import { useId, useState, type FormEvent } from 'react'
+import { useId, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useCurrentUser } from '@/auth/auth-context'
 import { Button } from '@/components/ui/button'
+import { showSaveError } from '@/lib/form-errors'
 import { formatMoney, parseAmountInCents, toApiAmount } from '@/lib/money'
-import { showSaveFailedToast, showSavedToast } from '@/lib/save-toasts'
+import { showSavedToast } from '@/lib/save-toasts'
 import { IncomeField } from '@/months/income-field'
+import {
+  INCOME_FORM_FIELDS,
+  incomeSchema,
+  type TypedIncome,
+  type ValidIncome,
+} from '@/months/income-schema'
 import { storeSavedMonth, updateMonthIncome, type Month } from '@/months/months-api'
 import { monthSummaryQueryKey } from '@/summary/summary-api'
 
@@ -21,8 +30,18 @@ export function MonthIncome({ month }: MonthIncomeProps) {
   const [isEditing, setIsEditing] = useState(false)
   // The saved "3000.00" shows as "3000".
   const savedTypedIncome = String(Number(month.income))
-  const [typedIncome, setTypedIncome] = useState(savedTypedIncome)
-  const incomeInCents = parseAmountInCents(typedIncome)
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors },
+  } = useForm<TypedIncome, unknown, ValidIncome>({
+    resolver: zodResolver(incomeSchema),
+    mode: 'onSubmit',
+    reValidateMode: 'onChange',
+    defaultValues: { income: savedTypedIncome },
+  })
   const saveMutation = useMutation({
     mutationFn: (newIncome: string) => updateMonthIncome(month, newIncome),
     onSuccess: async (updatedMonth) => {
@@ -32,20 +51,21 @@ export function MonthIncome({ month }: MonthIncomeProps) {
       void queryClient.invalidateQueries({ queryKey: monthSummaryQueryKey(month) })
       setIsEditing(false)
     },
-    // The form stays open with what the user typed, to try again.
-    onError: showSaveFailedToast,
   })
 
   function startEditing() {
-    setTypedIncome(savedTypedIncome)
+    reset({ income: savedTypedIncome })
     saveMutation.reset()
     setIsEditing(true)
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (incomeInCents === null) return
-    saveMutation.mutate(toApiAmount(incomeInCents))
+  async function saveIncome({ income }: ValidIncome) {
+    try {
+      await saveMutation.mutateAsync(toApiAmount(income))
+    } catch (saveError) {
+      // The form stays open with what the user typed, to try again.
+      showSaveError(saveError, INCOME_FORM_FIELDS, setError)
+    }
   }
 
   if (!isEditing) {
@@ -71,15 +91,19 @@ export function MonthIncome({ month }: MonthIncomeProps) {
   }
 
   return (
-    <form className="max-w-md space-y-4" onSubmit={handleSubmit} noValidate>
+    <form
+      className="max-w-md space-y-4"
+      onSubmit={(submitEvent) => void handleSubmit(saveIncome)(submitEvent)}
+      noValidate
+    >
       <IncomeField
         id="month-income"
         label="Income"
-        typedIncome={typedIncome}
-        onChange={setTypedIncome}
+        incomeRegistration={register('income')}
+        errorMessage={errors.income?.message}
       />
       <div className="flex gap-2">
-        <Button type="submit" disabled={incomeInCents === null || saveMutation.isPending}>
+        <Button type="submit" disabled={saveMutation.isPending}>
           {saveMutation.isPending ? 'Saving…' : 'Save income'}
         </Button>
         <Button

@@ -7,6 +7,6 @@ export function showSavedToast(confirmation: string): void {
 }
 
 /** Tells the user a save failed: the API's message, or a generic one for any other error. */
-export function showSaveFailedToast(saveError: Error): void {
+export function showSaveFailedToast(saveError: unknown): void {
   toast.error(saveError instanceof ApiError ? saveError.message : UNKNOWN_ERROR_MESSAGE)
 }

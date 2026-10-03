@@ -1,18 +1,21 @@
+import type { UseFormRegisterReturn } from 'react-hook-form'
+import { FormFieldError } from '@/components/form-field-error'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { parseAmountInCents } from '@/lib/money'
+import { invalidFieldProps } from '@/lib/form-errors'
 
 interface IncomeFieldProps {
   id: string
   label: string
-  typedIncome: string
-  onChange: (typedIncome: string) => void
+  /** The field's registration with the form, from `register('income')`. */
+  incomeRegistration: UseFormRegisterReturn<'income'>
+  /** The error to show under the field, if any. */
+  errorMessage: string | undefined
 }
 
-/** A text field for a month's income that flags anything but an amount with 2 decimals. */
-export function IncomeField({ id, label, typedIncome, onChange }: IncomeFieldProps) {
+/** A text field for a month's income, with its error under it. */
+export function IncomeField({ id, label, incomeRegistration, errorMessage }: IncomeFieldProps) {
   const errorId = `${id}-error`
-  const isInvalid = typedIncome.trim() !== '' && parseAmountInCents(typedIncome) === null
 
   return (
     <div className="space-y-2">
@@ -23,16 +26,10 @@ export function IncomeField({ id, label, typedIncome, onChange }: IncomeFieldPro
         autoComplete="off"
         placeholder="e.g. 3000"
         className="max-w-48"
-        aria-invalid={isInvalid}
-        aria-describedby={isInvalid ? errorId : undefined}
-        value={typedIncome}
-        onChange={(event) => onChange(event.target.value)}
+        {...invalidFieldProps(errorId, errorMessage)}
+        {...incomeRegistration}
       />
-      {isInvalid && (
-        <p id={errorId} className="text-sm text-destructive">
-          Enter an amount such as 3000 or 3000.50, with at most 2 decimals.
-        </p>
-      )}
+      <FormFieldError id={errorId} message={errorMessage} />
     </div>
   )
 }
