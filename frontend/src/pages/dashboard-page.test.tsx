@@ -16,6 +16,7 @@ import {
   signInBeforeRender,
   startedSeptember2026,
   summaryOfStartedMonth,
+  wasSent,
 } from '@/test/api-mock'
 import { findLoadingSkeleton, unlabelledBusySkeletons } from '@/test/loading-skeleton'
 import { createTestQueryClient, renderApp } from '@/test/render-app'
@@ -23,7 +24,14 @@ import { findToast, shownToasts } from '@/test/toasts'
 
 const startedJuly2026: Month = { ...startedSeptember2026, month: 7, income: '2800.00' }
 const updatedSeptember2026: Month = { ...startedSeptember2026, income: '3500.50' }
+const SERVER_INCOME_ERROR_MESSAGE = 'Input should be greater than or equal to 0'
 const welcomeLine = "Welcome to Rich Life. Start your first month by entering this month's income."
+
+function incomeRejectedResponse(): Response {
+  return errorResponse(422, 'validation_failed', 'Some fields are invalid.', [
+    { field: 'income', message: SERVER_INCOME_ERROR_MESSAGE },
+  ])
+}
 
 function mockMonthsApi(extraResponders: Record<string, ApiResponder> = {}) {
   return mockApi({
@@ -49,7 +57,7 @@ function mockStartedMonthsApi(extraResponders: Record<string, ApiResponder> = {}
 async function typeIncome(typedIncome: string) {
   const incomeInput = await screen.findByLabelText('Income')
   await userEvent.clear(incomeInput)
-  await userEvent.type(incomeInput, typedIncome)
+  if (typedIncome) await userEvent.type(incomeInput, typedIncome)
 }
 
 async function startMonthWithIncome(typedIncome: string) {
@@ -128,32 +136,89 @@ describe('DashboardPage', () => {
     expect(await shownIncome()).toHaveTextContent('€3,000.00')
   })
 
-  it("can't start the month before an income is typed", async () => {
-    mockMonthsApi()
-
-    renderApp('/')
-
-    expect(await screen.findByRole('button', { name: 'Start this month' })).toBeDisabled()
-  })
-
-  it("can't start the month when the income is not an amount", async () => {
+  it('shows no income error before the month is first started', async () => {
     mockMonthsApi()
     renderApp('/')
 
     await typeIncome('abc')
 
-    expect(screen.getByRole('button', { name: 'Start this month' })).toBeDisabled()
+    expect(screen.getByLabelText('Income')).not.toHaveAccessibleDescription()
   })
 
-  it('flags an income that is not an amount', async () => {
+  it.each([
+    ['an empty income', '', 'Enter an amount such as 3000 or 3000.50, with at most 2 decimals.'],
+    [
+      'a negative income',
+      '-100',
+      'Enter an amount such as 3000 or 3000.50, with at most 2 decimals.',
+    ],
+    ['text', 'abc', 'Enter an amount such as 3000 or 3000.50, with at most 2 decimals.'],
+    ['an income above the maximum', '10000000000', 'Enter an amount up to 9,999,999,999.99'],
+    ['an income with 3 decimal places', '12.345', 'Use at most 2 decimal places'],
+  ])('flags %s when starting the month', async (_, typedIncome, expectedError) => {
     mockMonthsApi()
     renderApp('/')
 
-    await typeIncome('12.345')
+    await startMonthWithIncome(typedIncome)
 
-    expect(screen.getByLabelText('Income')).toHaveAccessibleDescription(
-      'Enter an amount such as 3000 or 3000.50, with at most 2 decimals.',
-    )
+    expect(screen.getByLabelText('Income')).toHaveAccessibleDescription(expectedError)
+  })
+
+  it('marks an invalid income as invalid when starting the month', async () => {
+    mockMonthsApi()
+    renderApp('/')
+
+    await startMonthWithIncome('abc')
+
+    expect(screen.getByLabelText('Income')).toBeInvalid()
+  })
+
+  it('does not start the month with a negative income', async () => {
+    const fetchMock = mockMonthsApi()
+    renderApp('/')
+
+    await startMonthWithIncome('-100')
+
+    await screen.findByText('Enter an amount such as 3000 or 3000.50, with at most 2 decimals.')
+    expect(wasSent(fetchMock, 'POST /months')).toBe(false)
+  })
+
+  it('keeps the start button enabled while the income is invalid', async () => {
+    mockMonthsApi()
+    renderApp('/')
+
+    await startMonthWithIncome('abc')
+
+    expect(screen.getByRole('button', { name: 'Start this month' })).toBeEnabled()
+  })
+
+  it('clears the income error as the user corrects it', async () => {
+    mockMonthsApi()
+    renderApp('/')
+    await startMonthWithIncome('12.345')
+
+    await userEvent.type(screen.getByLabelText('Income'), '{Backspace}')
+
+    expect(screen.getByLabelText('Income')).not.toHaveAccessibleDescription()
+  })
+
+  it("shows the server's error about the income under the income field", async () => {
+    mockMonthsApi({ 'POST /months': incomeRejectedResponse })
+    renderApp('/')
+
+    await startMonthWithIncome('3000')
+
+    expect(await screen.findByText(SERVER_INCOME_ERROR_MESSAGE)).toBeInTheDocument()
+  })
+
+  it("shows no toast for the server's error about the income", async () => {
+    mockMonthsApi({ 'POST /months': incomeRejectedResponse })
+    renderApp('/')
+
+    await startMonthWithIncome('3000')
+
+    await screen.findByText(SERVER_INCOME_ERROR_MESSAGE)
+    expect(await shownToasts()).toEqual([])
   })
 
   it('confirms that the month was started', async () => {
@@ -435,13 +500,25 @@ describe('DashboardPage', () => {
     expect(await shownIncome()).toHaveTextContent('€3,500.50')
   })
 
-  it("can't save an income that is not an amount", async () => {
-    mockStartedMonthsApi()
+  it('does not save a negative income', async () => {
+    const fetchMock = mockStartedMonthsApi()
     renderApp('/')
+    await editIncome('-100')
 
-    await editIncome('abc')
+    await userEvent.click(screen.getByRole('button', { name: 'Save income' }))
 
-    expect(screen.getByRole('button', { name: 'Save income' })).toBeDisabled()
+    await screen.findByText('Enter an amount such as 3000 or 3000.50, with at most 2 decimals.')
+    expect(wasSent(fetchMock, 'PATCH /months/2026/9')).toBe(false)
+  })
+
+  it("shows the server's error about the edited income under the income field", async () => {
+    mockStartedMonthsApi({ 'PATCH /months/2026/9': incomeRejectedResponse })
+    renderApp('/')
+    await editIncome('3500.50')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save income' }))
+
+    expect(await screen.findByText(SERVER_INCOME_ERROR_MESSAGE)).toBeInTheDocument()
   })
 
   it('keeps the saved income when editing is cancelled', async () => {

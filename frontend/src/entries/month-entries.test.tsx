@@ -5,6 +5,7 @@ import type { Month } from '@/months/months-api'
 import {
   type ApiResponder,
   emptyResponse,
+  errorResponse,
   groceriesEntry,
   inSequence,
   internalErrorResponse,
@@ -24,7 +25,7 @@ import {
 } from '@/test/api-mock'
 import { findLoadingSkeleton } from '@/test/loading-skeleton'
 import { renderApp } from '@/test/render-app'
-import { findToast } from '@/test/toasts'
+import { findToast, shownToasts } from '@/test/toasts'
 
 const lunchEntry: Entry = {
   id: 3,
@@ -38,6 +39,13 @@ const changedRentEntry: Entry = { ...rentEntry, amount: '1250.00', description: 
 const updatedSeptember2026: Month = { ...startedSeptember2026, income: '3500.00' }
 const summaryOfSavedEntries = summaryOfStartedMonth({ fixed_costs: '1200.00', guilt_free: '45.50' })
 const noEntriesMessage = 'No entries yet. Add your first expense above.'
+const SERVER_AMOUNT_ERROR_MESSAGE = 'Input should be greater than 0'
+
+function amountRejectedResponse(): Response {
+  return errorResponse(422, 'validation_failed', 'Some fields are invalid.', [
+    { field: 'amount', message: SERVER_AMOUNT_ERROR_MESSAGE },
+  ])
+}
 
 function mockEntriesApi(extraResponders: Record<string, ApiResponder> = {}) {
   return mockApi({
@@ -81,9 +89,13 @@ async function fillNewEntry({ amount, bucketLabel, date, description }: TypedNew
   await replaceText(form.getByLabelText('Description (optional)'), description)
 }
 
-async function addLunch() {
-  await fillNewEntry({ amount: '12.5', bucketLabel: 'Guilt-Free Spending', description: 'Lunch' })
+async function addEntryWith(typedNewEntry: TypedNewEntry) {
+  await fillNewEntry(typedNewEntry)
   await userEvent.click(screen.getByRole('button', { name: 'Add entry' }))
+}
+
+async function addLunch() {
+  await addEntryWith({ amount: '12.5', bucketLabel: 'Guilt-Free Spending', description: 'Lunch' })
 }
 
 async function editRentAmount(typedAmount: string) {
@@ -355,76 +367,161 @@ describe('MonthEntries', () => {
     expect(within(await addEntryForm()).getByLabelText('Date')).toHaveValue('2026-09-20')
   })
 
-  it("can't add an entry of 0", async () => {
+  it('shows no amount error before the entry is first submitted', async () => {
     mockEntriesApi()
     renderApp('/')
 
     await fillNewEntry({ amount: '0', bucketLabel: 'Savings', description: '' })
 
-    expect(screen.getByRole('button', { name: 'Add entry' })).toBeDisabled()
+    expect(within(await addEntryForm()).getByLabelText('Amount')).not.toHaveAccessibleDescription()
   })
 
-  it('flags an amount of 0', async () => {
+  it.each([
+    ['an amount of 0', '0', 'Enter an amount greater than 0'],
+    ['an empty amount', '', 'Enter an amount greater than 0'],
+    ['a negative amount', '-5', 'Enter an amount greater than 0'],
+    ['an amount above the maximum', '10000000000', 'Enter an amount up to 9,999,999,999.99'],
+    ['an amount with 3 decimal places', '12.345', 'Use at most 2 decimal places'],
+  ])('flags %s on submit', async (_, typedAmount, expectedError) => {
     mockEntriesApi()
     renderApp('/')
 
-    await fillNewEntry({ amount: '0', bucketLabel: 'Savings', description: '' })
+    await addEntryWith({ amount: typedAmount, bucketLabel: 'Savings', description: '' })
 
     expect(within(await addEntryForm()).getByLabelText('Amount')).toHaveAccessibleDescription(
-      'Enter an amount above 0 such as 12 or 12.50, with at most 2 decimals.',
+      expectedError,
     )
   })
 
-  it('flags an amount with more than 2 decimals', async () => {
+  it('marks an invalid amount as invalid on submit', async () => {
     mockEntriesApi()
     renderApp('/')
 
-    await fillNewEntry({ amount: '12.345', bucketLabel: 'Savings', description: '' })
+    await addEntryWith({ amount: '0', bucketLabel: 'Savings', description: '' })
 
-    expect(within(await addEntryForm()).getByLabelText('Amount')).toHaveAccessibleDescription(
-      'Enter an amount above 0 such as 12 or 12.50, with at most 2 decimals.',
-    )
+    expect(within(await addEntryForm()).getByLabelText('Amount')).toBeInvalid()
   })
 
-  it('flags a date outside the month', async () => {
+  it('does not send an entry of 0', async () => {
+    const fetchMock = mockEntriesApi()
+    renderApp('/')
+
+    await addEntryWith({ amount: '0', bucketLabel: 'Savings', description: '' })
+
+    await screen.findByText('Enter an amount greater than 0')
+    expect(wasSent(fetchMock, 'POST /months/2026/9/entries')).toBe(false)
+  })
+
+  it('keeps the add button enabled while the entry is invalid', async () => {
     mockEntriesApi()
     renderApp('/')
 
-    await fillNewEntry({
-      amount: '12',
-      bucketLabel: 'Savings',
-      date: '2026-10-01',
-      description: '',
-    })
+    await addEntryWith({ amount: '0', bucketLabel: 'Savings', description: '' })
+
+    await screen.findByText('Enter an amount greater than 0')
+    expect(screen.getByRole('button', { name: 'Add entry' })).toBeEnabled()
+  })
+
+  it('clears the amount error as the user corrects it', async () => {
+    mockEntriesApi()
+    renderApp('/')
+    await addEntryWith({ amount: '0', bucketLabel: 'Savings', description: '' })
+    const amountInput = within(await addEntryForm()).getByLabelText('Amount')
+    await screen.findByText('Enter an amount greater than 0')
+
+    await userEvent.type(amountInput, '5')
+
+    expect(amountInput).not.toHaveAccessibleDescription()
+  })
+
+  it('flags a description over 255 characters on submit', async () => {
+    mockEntriesApi()
+    renderApp('/')
+    await fillNewEntry({ amount: '12', bucketLabel: 'Savings', description: '' })
+    await userEvent.click(within(await addEntryForm()).getByLabelText('Description (optional)'))
+    await userEvent.paste('a'.repeat(256))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add entry' }))
+
+    expect(
+      within(await addEntryForm()).getByLabelText('Description (optional)'),
+    ).toHaveAccessibleDescription('Keep the description to 255 characters or fewer')
+  })
+
+  it.each([
+    ['a date outside the month', '2026-10-01'],
+    ['an empty date', ''],
+  ])('flags %s on submit', async (_, typedDate) => {
+    mockEntriesApi()
+    renderApp('/')
+
+    await addEntryWith({ amount: '12', bucketLabel: 'Savings', date: typedDate, description: '' })
 
     expect(within(await addEntryForm()).getByLabelText('Date')).toHaveAccessibleDescription(
       'Pick a day in September 2026.',
     )
   })
 
-  it('flags an empty date', async () => {
-    mockEntriesApi()
+  it('does not send an entry dated outside the month', async () => {
+    const fetchMock = mockEntriesApi()
     renderApp('/')
 
-    await fillNewEntry({ amount: '12', bucketLabel: 'Savings', date: '', description: '' })
-
-    expect(within(await addEntryForm()).getByLabelText('Date')).toHaveAccessibleDescription(
-      'Pick a day in September 2026.',
-    )
-  })
-
-  it("can't add an entry dated outside the month", async () => {
-    mockEntriesApi()
-    renderApp('/')
-
-    await fillNewEntry({
+    await addEntryWith({
       amount: '12',
       bucketLabel: 'Savings',
       date: '2026-10-01',
       description: '',
     })
 
-    expect(screen.getByRole('button', { name: 'Add entry' })).toBeDisabled()
+    await screen.findByText('Pick a day in September 2026.')
+    expect(wasSent(fetchMock, 'POST /months/2026/9/entries')).toBe(false)
+  })
+
+  it("shows the server's error about the amount under the amount field", async () => {
+    mockEntriesApi({ 'POST /months/2026/9/entries': amountRejectedResponse })
+    renderApp('/')
+
+    await addLunch()
+
+    expect(
+      await within(await addEntryForm()).findByText(SERVER_AMOUNT_ERROR_MESSAGE),
+    ).toBeInTheDocument()
+  })
+
+  it("links the server's error about the amount to the amount field", async () => {
+    mockEntriesApi({ 'POST /months/2026/9/entries': amountRejectedResponse })
+    renderApp('/')
+
+    await addLunch()
+
+    await screen.findByText(SERVER_AMOUNT_ERROR_MESSAGE)
+    expect(within(await addEntryForm()).getByLabelText('Amount')).toHaveAccessibleDescription(
+      SERVER_AMOUNT_ERROR_MESSAGE,
+    )
+  })
+
+  it("shows no toast for the server's error about the amount", async () => {
+    mockEntriesApi({ 'POST /months/2026/9/entries': amountRejectedResponse })
+    renderApp('/')
+
+    await addLunch()
+
+    await screen.findByText(SERVER_AMOUNT_ERROR_MESSAGE)
+    expect(await shownToasts()).toEqual([])
+  })
+
+  it('shows a toast for a server error about a value the form does not have', async () => {
+    mockEntriesApi({
+      'POST /months/2026/9/entries': () =>
+        errorResponse(422, 'validation_failed', 'Some fields are invalid.', [
+          { field: 'body', message: 'JSON decode error' },
+        ]),
+    })
+    renderApp('/')
+
+    await addLunch()
+
+    expect(await findToast('Some fields are invalid.')).toHaveAttribute('data-type', 'error')
   })
 
   it("can't change the new entry while it is being added", async () => {
@@ -544,13 +641,25 @@ describe('MonthEntries', () => {
     ).toBeInTheDocument()
   })
 
-  it("can't save an entry of 0", async () => {
-    mockEntriesApi()
+  it('does not send a changed entry of 0', async () => {
+    const fetchMock = mockEntriesApi()
     renderApp('/')
-
     await editRentAmount('0')
 
-    expect(screen.getByRole('button', { name: 'Save entry' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Save entry' }))
+
+    await screen.findByText('Enter an amount greater than 0')
+    expect(wasSent(fetchMock, 'PATCH /entries/1')).toBe(false)
+  })
+
+  it("shows the server's error about the amount under the changed entry's amount", async () => {
+    mockEntriesApi({ 'PATCH /entries/1': amountRejectedResponse })
+    renderApp('/')
+
+    await changeRent()
+
+    const form = within(screen.getByRole('form', { name: 'Edit Rent' }))
+    expect(await form.findByText(SERVER_AMOUNT_ERROR_MESSAGE)).toBeInTheDocument()
   })
 
   it('keeps the saved entry when editing is cancelled', async () => {

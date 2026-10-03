@@ -8,8 +8,9 @@ import {
   type NewEntry,
 } from '@/entries/entries-api'
 import { defaultEntryDate } from '@/entries/entry-date'
-import { EntryForm, type TypedEntry } from '@/entries/entry-form'
-import { showSaveFailedToast, showSavedToast } from '@/lib/save-toasts'
+import { EntryForm } from '@/entries/entry-form'
+import type { TypedEntry } from '@/entries/entry-schema'
+import { showSavedToast } from '@/lib/save-toasts'
 import type { CalendarMonth } from '@/months/calendar-month'
 import { BUCKETS } from '@/spending-plan/buckets'
 
@@ -21,7 +22,7 @@ interface AddEntryFormProps {
 export function AddEntryForm({ calendarMonth }: AddEntryFormProps) {
   const queryClient = useQueryClient()
   const [nextEntry, setNextEntry] = useState<TypedEntry>(() => ({
-    typedAmount: '',
+    amount: '',
     bucket: BUCKETS[0],
     date: defaultEntryDate(calendarMonth),
     description: '',
@@ -34,7 +35,7 @@ export function AddEntryForm({ calendarMonth }: AddEntryFormProps) {
       showSavedToast('Entry added')
       // The next entry keeps the bucket and date, which suits adding several in a row.
       setNextEntry({
-        typedAmount: '',
+        amount: '',
         bucket: createdEntry.bucket,
         date: createdEntry.date,
         description: '',
@@ -44,8 +45,6 @@ export function AddEntryForm({ calendarMonth }: AddEntryFormProps) {
       await storeAddedEntry(queryClient, calendarMonth, createdEntry)
       await refreshMonthEntries(queryClient, calendarMonth)
     },
-    // The form keeps what the user typed, to try again.
-    onError: showSaveFailedToast,
   })
 
   return (
@@ -56,13 +55,14 @@ export function AddEntryForm({ calendarMonth }: AddEntryFormProps) {
         label="Add an entry"
         calendarMonth={calendarMonth}
         initialEntry={nextEntry}
-        onSave={(newEntry) => addMutation.mutate(newEntry)}
+        // On failure the form keeps what the user typed, to try again.
+        onSave={addMutation.mutateAsync}
         isSaving={addMutation.isPending}
-        renderActions={(canSave) => (
-          <Button type="submit" disabled={!canSave || addMutation.isPending}>
+        actions={
+          <Button type="submit" disabled={addMutation.isPending}>
             {addMutation.isPending ? 'Adding…' : 'Add entry'}
           </Button>
-        )}
+        }
       />
     </div>
   )
