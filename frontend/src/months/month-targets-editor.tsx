@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { SlidersHorizontal } from 'lucide-react'
 import { useId, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { showSaveFailedToast, showSavedToast } from '@/lib/save-toasts'
+import { showSavedToast } from '@/lib/save-toasts'
 import { storeSavedMonth, updateMonthTargets, type Month } from '@/months/months-api'
 import { BucketPercentagesForm } from '@/spending-plan/bucket-percentages-form'
 import type { SpendingPlanPercentages } from '@/spending-plan/spending-plan-api'
@@ -30,8 +30,6 @@ export function MonthTargetsEditor({ month }: MonthTargetsEditorProps) {
       void queryClient.invalidateQueries({ queryKey: monthSummaryQueryKey(month) })
       setIsEditing(false)
     },
-    // The form stays open with what the user typed, to try again.
-    onError: showSaveFailedToast,
   })
 
   function startEditing() {
@@ -60,7 +58,8 @@ export function MonthTargetsEditor({ month }: MonthTargetsEditorProps) {
       </div>
       <BucketPercentagesForm
         initialPercentages={month}
-        onSave={saveMutation.mutate}
+        // On failure the form stays open with what the user typed, to try again.
+        onSave={saveMutation.mutateAsync}
         isSaving={saveMutation.isPending}
         submitLabel="Save this month's plan"
         previewIncome={month.income}
