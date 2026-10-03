@@ -13,6 +13,7 @@ import {
   mockApi,
   sentJsonBody,
   signedInUser,
+  wasSent,
 } from '@/test/api-mock'
 import { renderApp } from '@/test/render-app'
 
@@ -49,6 +50,15 @@ const newPasskey: RegistrationResponseJSON = {
   clientExtensionResults: {},
 }
 
+const INVALID_EMAIL_MESSAGE = 'Enter an email address like you@example.com'
+const SERVER_EMAIL_ERROR_MESSAGE = 'value is not a valid email address'
+
+function emailRejectedResponse(): Response {
+  return errorResponse(422, 'validation_failed', 'Some fields are invalid.', [
+    { field: 'email', message: SERVER_EMAIL_ERROR_MESSAGE },
+  ])
+}
+
 function mockRegistrationApi(registerChallengeResponder = () => jsonResponse(registrationOptions)) {
   return mockApi({
     'POST /auth/register-challenge': registerChallengeResponder,
@@ -59,7 +69,7 @@ function mockRegistrationApi(registerChallengeResponder = () => jsonResponse(reg
 }
 
 async function registerAs(email: string) {
-  await userEvent.type(screen.getByLabelText('Email'), email)
+  if (email) await userEvent.type(screen.getByLabelText('Email'), email)
   await userEvent.click(screen.getByRole('button', { name: 'Create a passkey' }))
 }
 
@@ -125,6 +135,86 @@ describe('RegisterPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'The passkey prompt was cancelled or timed out. Please try again.',
     )
+  })
+
+  it('shows no email error before the form is first submitted', async () => {
+    mockRegistrationApi()
+    renderApp('/register')
+
+    await userEvent.type(screen.getByLabelText('Email'), 'not-an-email')
+
+    expect(screen.getByLabelText('Email')).not.toHaveAccessibleDescription()
+  })
+
+  it.each([
+    ['an invalid email', 'not-an-email'],
+    ['an empty email', ''],
+  ])('flags %s on submit', async (_, typedEmail) => {
+    mockRegistrationApi()
+    renderApp('/register')
+
+    await registerAs(typedEmail)
+
+    expect(screen.getByLabelText('Email')).toHaveAccessibleDescription(INVALID_EMAIL_MESSAGE)
+  })
+
+  it('marks an invalid email as invalid on submit', async () => {
+    mockRegistrationApi()
+    renderApp('/register')
+
+    await registerAs('not-an-email')
+
+    expect(screen.getByLabelText('Email')).toBeInvalid()
+  })
+
+  it('does not ask for a challenge for an invalid email', async () => {
+    const fetchMock = mockRegistrationApi()
+    renderApp('/register')
+
+    await registerAs('not-an-email')
+
+    await screen.findByText(INVALID_EMAIL_MESSAGE)
+    expect(wasSent(fetchMock, 'POST /auth/register-challenge')).toBe(false)
+  })
+
+  it('keeps the button enabled while the email is invalid', async () => {
+    mockRegistrationApi()
+    renderApp('/register')
+
+    await registerAs('not-an-email')
+
+    await screen.findByText(INVALID_EMAIL_MESSAGE)
+    expect(screen.getByRole('button', { name: 'Create a passkey' })).toBeEnabled()
+  })
+
+  it('clears the email error as the user corrects it', async () => {
+    mockRegistrationApi()
+    renderApp('/register')
+    await registerAs('ada')
+    await screen.findByText(INVALID_EMAIL_MESSAGE)
+
+    await userEvent.type(screen.getByLabelText('Email'), '@example.com')
+
+    expect(screen.getByLabelText('Email')).not.toHaveAccessibleDescription()
+  })
+
+  it("shows the server's error about the email under the email field", async () => {
+    mockRegistrationApi(emailRejectedResponse)
+    renderApp('/register')
+
+    await registerAs('ada@example.com')
+
+    expect(await screen.findByText(SERVER_EMAIL_ERROR_MESSAGE)).toBeInTheDocument()
+  })
+
+  it("shows no alert for the server's error about the email", async () => {
+    mockRegistrationApi(emailRejectedResponse)
+    renderApp('/register')
+
+    await registerAs('ada@example.com')
+
+    await screen.findByText(SERVER_EMAIL_ERROR_MESSAGE)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it("disables registering when the browser doesn't support passkeys", () => {
