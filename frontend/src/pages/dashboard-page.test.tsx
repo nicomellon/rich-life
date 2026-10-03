@@ -164,6 +164,15 @@ describe('DashboardPage', () => {
     expect(screen.getByLabelText('Income')).toHaveAccessibleDescription(expectedError)
   })
 
+  it('marks an invalid income as invalid when starting the month', async () => {
+    mockMonthsApi()
+    renderApp('/')
+
+    await startMonthWithIncome('abc')
+
+    expect(screen.getByLabelText('Income')).toBeInvalid()
+  })
+
   it('does not start the month with a negative income', async () => {
     const fetchMock = mockMonthsApi()
     renderApp('/')
