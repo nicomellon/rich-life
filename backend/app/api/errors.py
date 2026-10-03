@@ -42,6 +42,24 @@ PASSKEY_VERIFICATION_FAILED = ErrorKind(
     "Passkey verification failed",
     BEARER_CHALLENGE,
 )
+# Adding a passkey to a signed-in account failed. Not a 401: the user's token is fine,
+# and clients sign the user out on a 401.
+PASSKEY_ADDITION_FAILED = ErrorKind(
+    status.HTTP_400_BAD_REQUEST,
+    ErrorCode.PASSKEY_VERIFICATION_FAILED,
+    "Passkey verification failed",
+)
+MAGIC_LINK_INVALID = ErrorKind(
+    status.HTTP_401_UNAUTHORIZED,
+    ErrorCode.MAGIC_LINK_INVALID,
+    "This sign-in link is invalid, expired or already used.",
+    BEARER_CHALLENGE,
+)
+RATE_LIMITED = ErrorKind(
+    status.HTTP_429_TOO_MANY_REQUESTS,
+    ErrorCode.RATE_LIMITED,
+    "Too many requests. Please try again later.",
+)
 EMAIL_ALREADY_REGISTERED = ErrorKind(
     status.HTTP_409_CONFLICT,
     ErrorCode.EMAIL_ALREADY_REGISTERED,
@@ -79,10 +97,14 @@ VALUE_ERROR_PREFIX = "Value error, "
 
 
 class ApiError(HTTPException):
-    """An error of one of the kinds above, e.g. `raise ApiError(MONTH_NOT_FOUND)`."""
+    """An error of one of the kinds above, e.g. `raise ApiError(MONTH_NOT_FOUND)`.
+    `headers` replace the kind's own, for values known only when the error happens,
+    such as `Retry-After`."""
 
-    def __init__(self, kind: ErrorKind) -> None:
-        super().__init__(kind.status_code, kind.detail, kind.headers)
+    def __init__(
+        self, kind: ErrorKind, headers: Mapping[str, str] | None = None
+    ) -> None:
+        super().__init__(kind.status_code, kind.detail, headers or kind.headers)
         self.code = kind.code
 
 

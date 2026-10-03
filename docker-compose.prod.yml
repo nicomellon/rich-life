@@ -1,4 +1,5 @@
-# Production stack: Postgres, the API and the web app behind Caddy on ports 80 and 443.
+# Production stack: Postgres, Redis, the API and the web app behind Caddy on ports 80 and
+# 443.
 # Settings come from the environment; see .env.production.example and docs/deployment.md.
 #
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
@@ -22,6 +23,19 @@ services:
       timeout: 3s
       retries: 10
 
+  # Holds the magic-link tokens and the rate-limit counters, which only need to outlive
+  # a few minutes, so nothing is persisted.
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    # No published port: only the backend, on the compose network, reaches Redis.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build:
       context: ./backend
@@ -37,9 +51,17 @@ services:
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Rich Life}
       WEBAUTHN_ORIGIN: ${PUBLIC_ORIGIN:-https://${DOMAIN}}
       CORS_ORIGINS: ${PUBLIC_ORIGIN:-https://${DOMAIN}}
+      REDIS_URL: redis://redis:6379/0
+      # Sign-in links are sent through Resend; the backend refuses to start without
+      # EMAIL_API_KEY and EMAIL_FROM.
+      EMAIL_DELIVERY: ${EMAIL_DELIVERY:-resend}
+      EMAIL_API_KEY: ${EMAIL_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
     # The migrations run on start (docker-entrypoint.sh), so wait for the database.
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   web:
@@ -60,6 +82,14 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+# IPv6 on the compose network, so Caddy sees IPv6 visitors' own addresses. Without it
+# Docker forwards their connections over IPv4, they all seem to come from the network's
+# gateway, and they share one budget of the backend's per-IP rate limits. Needs Docker
+# Engine 27.0 or later, which picks a private IPv6 subnet by itself.
+networks:
+  default:
+    enable_ipv6: true
 
 volumes:
   db-data:

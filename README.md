@@ -12,7 +12,7 @@ A personal finance app for planning and tracking monthly spending. Each month's 
 |---|---|
 | `backend/` | API: Python, FastAPI, Pydantic, SQLAlchemy, Alembic |
 | `frontend/` | Web app: React, TypeScript, Vite |
-| `docker-compose.yml` | Local PostgreSQL database and optional pgAdmin |
+| `docker-compose.yml` | Local PostgreSQL database, Redis and optional pgAdmin |
 | `docker-compose.prod.yml` | Production stack: database, API and web app behind Caddy (see [docs/deployment.md](docs/deployment.md)) |
 | `scripts/` | Repository tooling, such as the commit convention checker |
 | `docs/` | Plans, design notes and the deployment guide |
@@ -29,7 +29,7 @@ A personal finance app for planning and tracking monthly spending. Each month's 
 
 ```sh
 make setup   # install the git hooks and dependencies, and create .env from .env.example
-make db      # start PostgreSQL and wait until it's ready
+make db      # start PostgreSQL and Redis and wait until they're ready
 make migrate # apply the database migrations
 make dev     # run the API on http://localhost:8000 and the web app on http://localhost:5173
 ```
@@ -48,7 +48,7 @@ postgresql://richlife:richlife@localhost:5432/richlife
 
 | Command | What it does |
 |---|---|
-| `make db` | Start Postgres (same as `docker compose up -d db`) |
+| `make db` | Start Postgres and Redis (same as `docker compose up -d db redis`) |
 | `make migrate` | Apply the migrations (`alembic upgrade head`) |
 | `make migration m="..."` | Autogenerate a migration from model changes |
 | `make seed email=...` | Add 3 months of example data to an account you registered in the app |
@@ -57,7 +57,9 @@ postgresql://richlife:richlife@localhost:5432/richlife
 | `make db-reset` | Delete all data and start a fresh database |
 | `make pgadmin` | Start pgAdmin on http://localhost:5050 (log in with `admin@example.com` / `admin`; the local server is preconfigured) |
 
-To change the port or credentials, edit `.env`. If you change the user or database name, also update `docker/pgadmin/servers.json`.
+Redis runs alongside it, at `redis://localhost:6379/0`, and holds the magic-link tokens and rate-limit counts. It keeps nothing on disk.
+
+To change the ports or credentials, edit `.env`. If you change the user or database name, also update `docker/pgadmin/servers.json`.
 
 ### Backend
 

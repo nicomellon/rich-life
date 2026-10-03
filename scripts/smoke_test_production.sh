@@ -15,6 +15,8 @@ export HTTP_PORT="$port"
 export HTTPS_PORT="${HTTPS_PORT:-8443}"
 export POSTGRES_PASSWORD=smoke-test-password
 export JWT_SECRET=smoke-test-secret-that-is-at-least-32-characters
+# Log sign-in links instead of emailing them, so the stack starts without a Resend key.
+export EMAIL_DELIVERY=log
 
 cleanup() {
     $compose down --volumes

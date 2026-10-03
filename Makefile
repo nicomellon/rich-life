@@ -46,17 +46,17 @@ seed: .env ## Add 3 months of example data to an account, e.g. make seed email=y
 	$(BACKEND) uv run --env-file ../.env python -m app.scripts.seed --email "$(email)"
 
 .PHONY: db
-db: ## Start Postgres in the background and wait until it's ready
-	$(COMPOSE) up -d --wait db
+db: ## Start Postgres and Redis in the background and wait until they're ready
+	$(COMPOSE) up -d --wait db redis
 
 .PHONY: db-stop
 db-stop: ## Stop all services, keeping the data
 	$(COMPOSE) --profile tools stop
 
 .PHONY: db-reset
-db-reset: ## Delete the database data and start Postgres again
+db-reset: ## Delete the database data and start Postgres and Redis again
 	$(COMPOSE) --profile tools down --volumes
-	$(COMPOSE) up -d --wait db
+	$(COMPOSE) up -d --wait db redis
 
 .PHONY: db-shell
 db-shell: ## Open psql in the database container

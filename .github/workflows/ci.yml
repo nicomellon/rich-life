@@ -38,10 +38,21 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+      redis:
+        # Same image as docker-compose.yml.
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     # The app reads its settings from the environment only.
     env:
       DATABASE_URL: postgresql+psycopg://richlife:richlife@localhost:5432/richlife
       JWT_SECRET: ci-secret-that-is-at-least-32-characters-long
+      REDIS_URL: redis://localhost:6379/0
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -105,11 +116,22 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+      redis:
+        # Same image as docker-compose.yml.
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     # Playwright starts the API and the web app, which read their settings from this
     # environment. The WebAuthn and CORS defaults already match the dev server's origin.
     env:
       DATABASE_URL: postgresql+psycopg://richlife:richlife@localhost:5432/richlife
       JWT_SECRET: ci-secret-that-is-at-least-32-characters-long
+      REDIS_URL: redis://localhost:6379/0
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

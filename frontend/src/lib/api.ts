@@ -14,6 +14,8 @@ export type FieldError = z.infer<typeof fieldErrorSchema>
 const errorCodeSchema = z.enum([
   'not_authenticated',
   'passkey_verification_failed',
+  'magic_link_invalid',
+  'rate_limited',
   'email_already_registered',
   'month_not_found',
   'entry_not_found',

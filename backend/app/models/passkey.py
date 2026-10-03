@@ -61,4 +61,9 @@ class WebAuthnChallenge(Base):
     # Registration only: the account to create once the passkey is verified.
     email: Mapped[str | None] = mapped_column(String(320))
     user_handle: Mapped[bytes | None] = mapped_column(LargeBinary(64))
+    # Registration only: the signed-in account a new passkey is added to. None when the
+    # registration creates an account.
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
     expires_at: Mapped[datetime]

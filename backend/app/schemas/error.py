@@ -8,6 +8,8 @@ class ErrorCode(StrEnum):
 
     NOT_AUTHENTICATED = "not_authenticated"
     PASSKEY_VERIFICATION_FAILED = "passkey_verification_failed"
+    MAGIC_LINK_INVALID = "magic_link_invalid"
+    RATE_LIMITED = "rate_limited"
     EMAIL_ALREADY_REGISTERED = "email_already_registered"
     MONTH_NOT_FOUND = "month_not_found"
     ENTRY_NOT_FOUND = "entry_not_found"
