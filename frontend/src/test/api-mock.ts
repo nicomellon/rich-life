@@ -77,6 +77,11 @@ export function emptyResponse(): Response {
   return new Response(null, { status: 204 })
 }
 
+/** The backend's empty 202, e.g. for a sign-in link it may or may not send. */
+export function acceptedResponse(): Response {
+  return new Response(null, { status: 202 })
+}
+
 /** The `fetch` call that sent `request`, e.g. `'DELETE /entries/1'`, if the app sent it. */
 function findSentRequest(fetchMock: ReturnType<typeof mockApi>, request: string) {
   const [method, path] = request.split(' ')
@@ -88,6 +93,21 @@ function findSentRequest(fetchMock: ReturnType<typeof mockApi>, request: string)
 /** Whether the app sent `request`, e.g. `'DELETE /entries/1'`. */
 export function wasSent(fetchMock: ReturnType<typeof mockApi>, request: string): boolean {
   return findSentRequest(fetchMock, request) !== undefined
+}
+
+/** How many times the app sent `request`, e.g. `'POST /auth/magic-link/verify'`. */
+export function timesSent(fetchMock: ReturnType<typeof mockApi>, request: string): number {
+  const [method, path] = request.split(' ')
+  return fetchMock.mock.calls.filter(
+    ([input, init]) => init?.method === method && String(input) === `/api/v1${path}`,
+  ).length
+}
+
+/** The headers the app sent with `request`, e.g. `'POST /auth/register-challenge'`. */
+export function sentHeaders(fetchMock: ReturnType<typeof mockApi>, request: string): Headers {
+  const sentRequest = findSentRequest(fetchMock, request)
+  if (!sentRequest) throw new Error(`No ${request} request was sent`)
+  return new Headers(sentRequest[1]?.headers)
 }
 
 /** The JSON body the app sent with `request`, e.g. `'POST /auth/verify-login'`. */

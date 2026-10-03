@@ -55,6 +55,11 @@ describe('passkeyErrorMessage', () => {
       'The passkey prompt was cancelled or timed out. Please try again.',
     ],
     [
+      'a passkey this device already has',
+      new DOMException('The authenticator was previously registered.', 'InvalidStateError'),
+      'This device already has a passkey for your account. You can sign in with it next time.',
+    ],
+    [
       'any other browser error',
       new DOMException('The authenticator failed.', 'UnknownError'),
       "Your passkey couldn't be used. Please try again.",

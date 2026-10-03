@@ -1,15 +1,8 @@
 import { z } from 'zod'
-
-export const EMAIL_INVALID_MESSAGE = 'Enter an email address like you@example.com'
+import { emailAddressSchema } from '@/auth/email-schema'
 
 /** The registration form's values. */
-export const registerSchema = z.object({
-  // Unicode, like the backend's `EmailStr`, so the app never rejects an address it accepts.
-  email: z
-    .string()
-    .trim()
-    .pipe(z.email({ pattern: z.regexes.unicodeEmail, message: EMAIL_INVALID_MESSAGE })),
-})
+export const registerSchema = z.object({ email: emailAddressSchema })
 
 export type TypedRegistration = z.input<typeof registerSchema>
 
