@@ -63,6 +63,12 @@ const newPasskey: RegistrationResponseJSON = {
   clientExtensionResults: {},
 }
 
+/** What the browser raises when the options exclude a passkey this device already holds. */
+const passkeyAlreadyOnDeviceError = new DOMException(
+  'The authenticator was previously registered.',
+  'InvalidStateError',
+)
+
 /** The token the backend issues once the passkey is added. */
 const tokenAfterAddingPasskey: AccessToken = {
   access_token: 'token-after-adding-passkey',
@@ -231,6 +237,40 @@ describe('SignInLinkPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'The passkey prompt was cancelled or timed out. Please try again.',
     )
+  })
+
+  it('explains that this device already has a passkey for the account', async () => {
+    mockSignInLinkApi()
+    vi.mocked(startRegistration).mockRejectedValue(passkeyAlreadyOnDeviceError)
+    renderApp(SIGN_IN_LINK_PATH)
+
+    await addPasskeyAfterSigningIn()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This device already has a passkey for your account. You can sign in with it next time.',
+    )
+  })
+
+  it('stops offering a passkey once the device turns out to have one', async () => {
+    mockSignInLinkApi()
+    vi.mocked(startRegistration).mockRejectedValue(passkeyAlreadyOnDeviceError)
+    renderApp(SIGN_IN_LINK_PATH)
+
+    await addPasskeyAfterSigningIn()
+
+    await screen.findByRole('alert')
+    expect(screen.queryByRole('button', { name: 'Add a passkey' })).not.toBeInTheDocument()
+  })
+
+  it('continues to the dashboard once the device turns out to have a passkey', async () => {
+    mockSignInLinkApi()
+    vi.mocked(startRegistration).mockRejectedValue(passkeyAlreadyOnDeviceError)
+    renderApp(SIGN_IN_LINK_PATH)
+    await addPasskeyAfterSigningIn()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Continue' }))
+
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
   })
 
   it('explains that the link is invalid, expired or used', async () => {

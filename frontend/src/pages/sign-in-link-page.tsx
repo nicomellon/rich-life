@@ -140,6 +140,11 @@ function AddPasskeyOffer() {
     },
   })
 
+  // The browser refuses a second passkey for the account on this device, so there's nothing to add.
+  const deviceHasPasskey =
+    addPasskeyMutation.isError && addPasskeyMutation.error.name === 'InvalidStateError'
+  const openDashboard = () => void navigate('/', { replace: true })
+
   return (
     <section className="space-y-6">
       <div className="space-y-2 text-center">
@@ -154,24 +159,30 @@ function AddPasskeyOffer() {
           {passkeyErrorMessage(addPasskeyMutation.error)}
         </p>
       )}
-      <div className="space-y-2">
-        <Button
-          className="w-full"
-          disabled={addPasskeyMutation.isPending}
-          onClick={() => addPasskeyMutation.mutate()}
-        >
-          <KeyRound />
-          {addPasskeyMutation.isPending ? 'Waiting for your passkey…' : 'Add a passkey'}
+      {deviceHasPasskey ? (
+        <Button className="w-full" onClick={openDashboard}>
+          Continue
         </Button>
-        <Button
-          variant="ghost"
-          className="w-full"
-          disabled={addPasskeyMutation.isPending}
-          onClick={() => void navigate('/', { replace: true })}
-        >
-          Not now
-        </Button>
-      </div>
+      ) : (
+        <div className="space-y-2">
+          <Button
+            className="w-full"
+            disabled={addPasskeyMutation.isPending}
+            onClick={() => addPasskeyMutation.mutate()}
+          >
+            <KeyRound />
+            {addPasskeyMutation.isPending ? 'Waiting for your passkey…' : 'Add a passkey'}
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full"
+            disabled={addPasskeyMutation.isPending}
+            onClick={openDashboard}
+          >
+            Not now
+          </Button>
+        </div>
+      )}
     </section>
   )
 }
