@@ -1,6 +1,6 @@
 import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import { useMutation } from '@tanstack/react-query'
-import { KeyRound } from 'lucide-react'
+import { KeyRound, Mail } from 'lucide-react'
 import { Link, useLocation } from 'react-router'
 import { signInWithPasskey } from '@/auth/auth-api'
 import { useAuth } from '@/auth/auth-context'
@@ -39,6 +39,12 @@ export function SignInPage() {
       >
         <KeyRound />
         {signInMutation.isPending ? 'Waiting for your passkey…' : 'Sign in with a passkey'}
+      </Button>
+      <Button asChild variant="outline" className="w-full">
+        <Link to="/sign-in/email">
+          <Mail />
+          Email me a sign-in link
+        </Link>
       </Button>
       <p className="text-center text-sm text-muted-foreground">
         New to Rich Life?{' '}

@@ -50,3 +50,29 @@ export async function signInWithPasskey(): Promise<AccessToken> {
   const assertion = await startAuthentication({ optionsJSON: signInOptions })
   return api.post<AccessToken>('/auth/verify-login', assertion)
 }
+
+/**
+ * Asks the backend to email a sign-in link to `email`. It answers the same whether or not an
+ * account uses the address, so this can't tell whether a link was sent.
+ */
+export function requestSignInLink(email: string): Promise<void> {
+  return api.post<void>('/auth/magic-link', { email })
+}
+
+/** Signs in with the token from an emailed sign-in link, which uses the link up. */
+export function signInWithLink(linkToken: string): Promise<AccessToken> {
+  return api.post<AccessToken>('/auth/magic-link/verify', { token: linkToken })
+}
+
+/**
+ * Adds a passkey on this device to the signed-in account. The backend answers with a fresh access
+ * token.
+ */
+export async function addPasskey(): Promise<AccessToken> {
+  // Signed in, the backend ignores the body and issues options for the current account.
+  const registrationOptions = await api.post<PublicKeyCredentialCreationOptionsJSON>(
+    '/auth/register-challenge',
+  )
+  const newCredential = await startRegistration({ optionsJSON: registrationOptions })
+  return api.post<AccessToken>('/auth/verify-registration', newCredential)
+}

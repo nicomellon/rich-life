@@ -1,6 +1,6 @@
 import { Outlet } from 'react-router'
 
-/** A centred column for the pages a signed-out user sees: sign in and register. */
+/** A centred column for the pages a signed-out user sees: sign in, register and the like. */
 export function AuthLayout() {
   return (
     <main className="flex min-h-svh items-center justify-center px-4 py-8">
