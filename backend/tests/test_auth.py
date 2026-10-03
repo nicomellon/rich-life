@@ -5,7 +5,7 @@ import jwt
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -213,7 +213,12 @@ def test_verify_registration_deletes_the_challenge(
     db: Session,
     registered_authenticator: SoftwareAuthenticator,
 ) -> None:
-    assert db.scalars(select(WebAuthnChallenge)).all() == []
+    assert (
+        db.scalars(
+            select(WebAuthnChallenge).where(WebAuthnChallenge.email == EMAIL)
+        ).all()
+        == []
+    )
 
 
 def test_second_of_two_racing_sign_ups_for_one_email_returns_409(
@@ -268,7 +273,7 @@ def test_verify_registration_rejects_a_reused_challenge(
     registration = authenticator.create(request_registration_options(client))
     post_model(client, "/api/v1/auth/verify-registration", registration)
     # Remove the account so only the spent challenge stands in the way.
-    db.query(User).delete()
+    db.execute(delete(User).where(User.email == EMAIL))
 
     response = post_model(client, "/api/v1/auth/verify-registration", registration)
 
@@ -344,12 +349,19 @@ def test_login_challenge_requires_user_verification(client: TestClient) -> None:
 def test_issuing_a_challenge_clears_expired_ones(
     client: TestClient, db: Session
 ) -> None:
-    request_authentication_options(client)
+    expired_options = request_authentication_options(client)
     expire_all_challenges(db)
 
     request_authentication_options(client)
 
-    assert len(db.scalars(select(WebAuthnChallenge)).all()) == 1
+    assert (
+        db.scalars(
+            select(WebAuthnChallenge).where(
+                WebAuthnChallenge.challenge == expired_options.challenge
+            )
+        ).all()
+        == []
+    )
 
 
 # Sign-in
