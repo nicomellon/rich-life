@@ -24,5 +24,9 @@ export function passkeyErrorMessage(error: Error): string {
   if (error.name === 'NotAllowedError') {
     return 'The passkey prompt was cancelled or timed out. Please try again.'
   }
+  // The device already holds a passkey for this account, which the options exclude.
+  if (error.name === 'InvalidStateError') {
+    return 'This device already has a passkey for your account. You can sign in with it next time.'
+  }
   return "Your passkey couldn't be used. Please try again."
 }
