@@ -24,9 +24,6 @@ export interface NewEntry {
   description: string
 }
 
-/** The backend's longest description (`DESCRIPTION_MAX_LENGTH`). */
-export const DESCRIPTION_MAX_LENGTH = 255
-
 export function monthEntriesQueryKey({ year, month }: CalendarMonth) {
   return ['entries', year, month] as const
 }

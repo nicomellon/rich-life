@@ -12,7 +12,8 @@ import {
   type NewEntry,
 } from '@/entries/entries-api'
 import { formatEntryDate } from '@/entries/entry-date'
-import { EntryForm, type TypedEntry } from '@/entries/entry-form'
+import { EntryForm } from '@/entries/entry-form'
+import type { TypedEntry } from '@/entries/entry-schema'
 import { showSaveFailedToast, showSavedToast } from '@/lib/save-toasts'
 import type { CalendarMonth } from '@/months/calendar-month'
 
@@ -40,8 +41,6 @@ export function EntryRow({ entry, calendarMonth, formatAmount }: EntryRowProps) 
       await refreshMonthEntries(queryClient, calendarMonth)
       setMode('viewing')
     },
-    // The form stays open with what the user typed, to try again.
-    onError: showSaveFailedToast,
   })
   const deleteMutation = useMutation({
     mutationFn: () => deleteEntry(entry.id),
@@ -67,11 +66,12 @@ export function EntryRow({ entry, calendarMonth, formatAmount }: EntryRowProps) 
           label={`Edit ${entryName}`}
           calendarMonth={calendarMonth}
           initialEntry={toTypedEntry(entry)}
-          onSave={(changedEntry) => updateMutation.mutate(changedEntry)}
+          // On failure the form stays open with what the user typed, to try again.
+          onSave={updateMutation.mutateAsync}
           isSaving={updateMutation.isPending}
-          renderActions={(canSave) => (
+          actions={
             <>
-              <Button type="submit" disabled={!canSave || updateMutation.isPending}>
+              <Button type="submit" disabled={updateMutation.isPending}>
                 {updateMutation.isPending ? 'Saving…' : 'Save entry'}
               </Button>
               <Button
@@ -83,7 +83,7 @@ export function EntryRow({ entry, calendarMonth, formatAmount }: EntryRowProps) 
                 Cancel
               </Button>
             </>
-          )}
+          }
         />
       </li>
     )
@@ -148,7 +148,7 @@ export function EntryRow({ entry, calendarMonth, formatAmount }: EntryRowProps) 
 /** The saved entry as the form shows it, e.g. an amount of "12.50" as "12.5". */
 function toTypedEntry(entry: Entry): TypedEntry {
   return {
-    typedAmount: String(Number(entry.amount)),
+    amount: String(Number(entry.amount)),
     bucket: entry.bucket,
     date: entry.date,
     description: entry.description,
