@@ -125,12 +125,12 @@ describe('api client', () => {
   })
 
   it('rejects with an unknown error when the error response has a code the app does not know', async () => {
-    mockFetch(jsonResponse({ detail: 'Too many requests', code: 'rate_limited' }, 429))
+    mockFetch(jsonResponse({ detail: 'Payment required', code: 'payment_required' }, 402))
 
     const apiError = await apiErrorOf(api.get('/months'))
 
     expect(apiError).toMatchObject({
-      status: 429,
+      status: 402,
       code: 'unknown_error',
       message: 'Something went wrong. Please try again.',
     })
