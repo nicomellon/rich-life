@@ -12,15 +12,17 @@ from app.core.config import get_settings
 from app.core.security import JWT_ALGORITHM, create_access_token, decode_access_token
 from app.models.passkey import Passkey, WebAuthnChallenge
 from app.models.user import User
-from app.schemas.auth import Token
+from app.schemas.auth import RegistrationChallengeRequest, Token
+from app.schemas.error import ErrorCode, ErrorResponse, FieldError
 from app.schemas.user import UserRead
-from app.schemas.webauthn import AuthenticationOptions
+from app.schemas.webauthn import AuthenticationOptions, RegistrationOptions
 from tests.accounts import (
     EMAIL,
     OTHER_EMAIL,
     auth_header,
     post_model,
     register,
+    request_passkey_addition_options,
     request_registration_options,
 )
 from tests.authenticator import SoftwareAuthenticator
@@ -37,6 +39,19 @@ def verify_registration(
 ) -> Response:
     registration = authenticator.create(request_registration_options(client))
     return post_model(client, "/api/v1/auth/verify-registration", registration)
+
+
+def add_passkey(
+    client: TestClient,
+    authenticator: SoftwareAuthenticator,
+    signed_in_headers: dict[str, str],
+) -> Response:
+    registration = authenticator.create(
+        request_passkey_addition_options(client, signed_in_headers)
+    )
+    return post_model(
+        client, "/api/v1/auth/verify-registration", registration, signed_in_headers
+    )
 
 
 def verify_login(client: TestClient, authenticator: SoftwareAuthenticator) -> Response:
@@ -62,22 +77,24 @@ def assert_verification_failed(response: Response) -> None:
     )
 
 
-@pytest.fixture
-def registered_authenticator(
-    client: TestClient,
-    authenticator: SoftwareAuthenticator,
-) -> SoftwareAuthenticator:
-    """An authenticator holding the passkey of a registered account."""
-    register(client, authenticator)
-    return authenticator
+def assert_addition_failed(response: Response) -> None:
+    """Adding a passkey failed with a 400, which doesn't sign the user out."""
+    assert (
+        response.status_code,
+        ErrorResponse.model_validate(response.json()),
+    ) == (
+        400,
+        ErrorResponse(
+            detail="Passkey verification failed",
+            code=ErrorCode.PASSKEY_VERIFICATION_FAILED,
+        ),
+    )
 
 
 @pytest.fixture
-def registered_user(
-    db: Session,
-    registered_authenticator: SoftwareAuthenticator,
-) -> User:
-    return db.scalars(select(User).where(User.email == EMAIL)).one()
+def registered_user_headers(registered_user: User) -> dict[str, str]:
+    """Authorization headers for `registered_user`."""
+    return auth_header(create_access_token(registered_user.id))
 
 
 # Registration options
@@ -158,6 +175,15 @@ def test_register_challenge_rejects_an_invalid_payload(
     response = client.post("/api/v1/auth/register-challenge", json=payload)
 
     assert response.status_code == 422
+
+
+def test_register_challenge_without_a_body_returns_422(client: TestClient) -> None:
+    response = client.post("/api/v1/auth/register-challenge")
+
+    assert (
+        response.status_code,
+        ErrorResponse.model_validate(response.json()).fields,
+    ) == (422, [FieldError(field="email", message="Field required")])
 
 
 # Registration
@@ -323,6 +349,228 @@ def test_verify_registration_rejects_a_malformed_credential(
     response = client.post("/api/v1/auth/verify-registration", json=payload)
 
     assert response.status_code == 422
+
+
+# Adding a passkey to a signed-in account
+
+
+def test_register_challenge_signed_in_names_the_current_user(
+    client: TestClient, signed_in_headers: dict[str, str]
+) -> None:
+    options = request_passkey_addition_options(client, signed_in_headers)
+
+    assert options.user.name == EMAIL
+
+
+def test_register_challenge_signed_in_reuses_the_accounts_user_handle(
+    client: TestClient,
+    registered_user: User,
+    registered_user_headers: dict[str, str],
+) -> None:
+    options = request_passkey_addition_options(client, registered_user_headers)
+
+    assert options.user.id == registered_user.webauthn_user_handle
+
+
+def test_register_challenge_signed_in_excludes_the_accounts_passkeys(
+    client: TestClient,
+    registered_user_headers: dict[str, str],
+    registered_authenticator: SoftwareAuthenticator,
+) -> None:
+    options = request_passkey_addition_options(client, registered_user_headers)
+
+    assert [credential.id for credential in options.exclude_credentials] == [
+        registered_authenticator.credential_id
+    ]
+
+
+def test_register_challenge_signed_in_ignores_the_email_in_the_body(
+    client: TestClient, signed_in_headers: dict[str, str]
+) -> None:
+    response = post_model(
+        client,
+        "/api/v1/auth/register-challenge",
+        RegistrationChallengeRequest(email=OTHER_EMAIL),
+        signed_in_headers,
+    )
+
+    assert RegistrationOptions.model_validate(response.json()).user.name == EMAIL
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [{}, {"email": "not-an-email"}],
+    ids=["missing-email", "invalid-email"],
+)
+def test_register_challenge_signed_in_accepts_any_body(
+    client: TestClient,
+    signed_in_headers: dict[str, str],
+    payload: dict[str, str],
+) -> None:
+    response = client.post(
+        "/api/v1/auth/register-challenge", json=payload, headers=signed_in_headers
+    )
+
+    assert response.status_code == 200
+
+
+def test_register_challenge_with_an_invalid_token_returns_401(
+    client: TestClient,
+) -> None:
+    response = post_model(
+        client,
+        "/api/v1/auth/register-challenge",
+        RegistrationChallengeRequest(email=EMAIL),
+        auth_header("not-a-jwt"),
+    )
+
+    assert (response.status_code, response.json()) == (
+        401,
+        {"detail": "Not authenticated", "code": "not_authenticated"},
+    )
+
+
+def test_verify_registration_signed_in_adds_the_passkey_to_the_account(
+    client: TestClient,
+    db: Session,
+    registered_user: User,
+    registered_user_headers: dict[str, str],
+) -> None:
+    add_passkey(client, SoftwareAuthenticator(), registered_user_headers)
+
+    passkeys = db.scalars(
+        select(Passkey).where(Passkey.user_id == registered_user.id)
+    ).all()
+    assert len(passkeys) == 2
+
+
+def test_verify_registration_signed_in_returns_a_token_for_the_account(
+    client: TestClient,
+    registered_user: User,
+    registered_user_headers: dict[str, str],
+) -> None:
+    response = add_passkey(client, SoftwareAuthenticator(), registered_user_headers)
+
+    claims = decode_access_token(Token.model_validate(response.json()).access_token)
+    assert (response.status_code, claims and claims.user_id) == (
+        201,
+        registered_user.id,
+    )
+
+
+def test_an_added_passkey_signs_in_to_the_account(
+    client: TestClient,
+    registered_user: User,
+    registered_user_headers: dict[str, str],
+) -> None:
+    added_authenticator = SoftwareAuthenticator()
+    add_passkey(client, added_authenticator, registered_user_headers)
+
+    response = verify_login(client, added_authenticator)
+
+    claims = decode_access_token(Token.model_validate(response.json()).access_token)
+    assert claims is not None and claims.user_id == registered_user.id
+
+
+def test_verify_registration_with_an_invalid_token_returns_401(
+    client: TestClient,
+    authenticator: SoftwareAuthenticator,
+) -> None:
+    registration = authenticator.create(request_registration_options(client))
+
+    response = post_model(
+        client,
+        "/api/v1/auth/verify-registration",
+        registration,
+        auth_header("not-a-jwt"),
+    )
+
+    assert (
+        response.status_code,
+        ErrorResponse.model_validate(response.json()),
+    ) == (
+        401,
+        ErrorResponse(detail="Not authenticated", code=ErrorCode.NOT_AUTHENTICATED),
+    )
+
+
+def test_verify_registration_signed_in_rejects_a_sign_up_challenge(
+    client: TestClient, signed_in_headers: dict[str, str]
+) -> None:
+    registration = SoftwareAuthenticator().create(
+        request_registration_options(client, OTHER_EMAIL)
+    )
+
+    response = post_model(
+        client, "/api/v1/auth/verify-registration", registration, signed_in_headers
+    )
+
+    assert_addition_failed(response)
+
+
+def test_verify_registration_signed_out_rejects_an_added_passkeys_challenge(
+    client: TestClient, signed_in_headers: dict[str, str]
+) -> None:
+    registration = SoftwareAuthenticator().create(
+        request_passkey_addition_options(client, signed_in_headers)
+    )
+
+    response = post_model(client, "/api/v1/auth/verify-registration", registration)
+
+    assert_verification_failed(response)
+
+
+def test_verify_registration_rejects_a_challenge_issued_to_another_account(
+    client: TestClient,
+    signed_in_headers: dict[str, str],
+    other_user_headers: dict[str, str],
+) -> None:
+    registration = SoftwareAuthenticator().create(
+        request_passkey_addition_options(client, signed_in_headers)
+    )
+
+    response = post_model(
+        client, "/api/v1/auth/verify-registration", registration, other_user_headers
+    )
+
+    assert_addition_failed(response)
+
+
+def test_verify_registration_signed_in_rejects_a_passkey_already_registered(
+    client: TestClient,
+    registered_user_headers: dict[str, str],
+    registered_authenticator: SoftwareAuthenticator,
+) -> None:
+    response = add_passkey(client, registered_authenticator, registered_user_headers)
+
+    assert_addition_failed(response)
+
+
+def test_verify_registration_signed_in_with_an_expired_challenge_returns_400(
+    client: TestClient,
+    db: Session,
+    signed_in_headers: dict[str, str],
+) -> None:
+    registration = SoftwareAuthenticator().create(
+        request_passkey_addition_options(client, signed_in_headers)
+    )
+    expire_all_challenges(db)
+
+    response = post_model(
+        client, "/api/v1/auth/verify-registration", registration, signed_in_headers
+    )
+
+    assert_addition_failed(response)
+
+
+def test_a_failed_passkey_addition_sends_no_bearer_challenge(
+    client: TestClient,
+    registered_user_headers: dict[str, str],
+    registered_authenticator: SoftwareAuthenticator,
+) -> None:
+    response = add_passkey(client, registered_authenticator, registered_user_headers)
+
+    assert "www-authenticate" not in response.headers
 
 
 # Sign-in options

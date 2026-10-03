@@ -32,6 +32,12 @@ Following the [twelve-factor](https://12factor.net/config) approach, `app/core/c
 | `WEBAUTHN_RP_NAME` | no | `Rich Life` (shown in the browser's passkey prompts) |
 | `WEBAUTHN_ORIGIN` | no | `http://localhost:5173` (the web app's origin) |
 | `CORS_ORIGINS` | no | `http://localhost:5173` (comma-separated list) |
+| `REDIS_URL` | no | `redis://localhost:6379/0` (holds magic-link tokens and rate-limit counts) |
+| `EMAIL_DELIVERY` | no | `log` (writes sign-in links to the log); `resend` emails them through [Resend](https://resend.com) |
+| `EMAIL_API_KEY` | with `resend` | none (Resend API key; the API refuses to start without it) |
+| `EMAIL_FROM` | with `resend` | none (the sender, e.g. `Rich Life <sign-in@example.com>`, on a domain verified in Resend) |
+| `MAGIC_LINK_EMAIL_LIMIT` | no | `3` (sign-in links one email address can ask for in 15 minutes) |
+| `MAGIC_LINK_IP_LIMIT` | no | `20` (link requests, and link sign-ins, one IP can make in 15 minutes) |
 
 ## Database
 
@@ -84,6 +90,17 @@ Users sign in with passkeys (WebAuthn, via [py_webauthn](https://github.com/duo-
 
 Both verify endpoints return a JWT access token signed with `JWT_SECRET`, or 401 if the credential doesn't verify. Challenges live in the `webauthn_challenges` table for 5 minutes and are deleted on first use, so each works once. Sign-in names no credentials, so the browser offers every passkey it has for the site and the user never types an email.
 
+Called with a bearer token, `register-challenge` and `verify-registration` add a passkey to the signed-in account instead of creating one: the body of `register-challenge` is optional and its `email` is ignored, and `verify-registration` returns a fresh token. A challenge only works for the kind of registration it was issued for, and for the same account. A bearer token that is sent but invalid or expired gets 401.
+
+### Magic links
+
+Users without a passkey on their device can sign in with an emailed link:
+
+1. `POST /api/v1/auth/magic-link` with `{email}` always responds 202 with no body, so it doesn't reveal which emails have accounts. If an account has the email, it emails a link to `{WEBAUTHN_ORIGIN}/sign-in/link#token=<token>`, where the token is 32 random bytes in base64url. Redis keeps only the token's SHA-256 hash, for 15 minutes. Asking again doesn't cancel earlier links.
+2. `POST /api/v1/auth/magic-link/verify` with `{token}` deletes the token and returns an access token, so each link signs in once. Unknown, expired and used tokens get 401 `magic_link_invalid`.
+
+Each email address can ask for 3 links, and each IP for 20, in any 15 minutes; each IP can also try 20 tokens. Over a limit, the API responds 429 `rate_limited` with a `Retry-After` header. With `EMAIL_DELIVERY=log`, the default for development, the email is written to the API's log instead of being sent.
+
 Send the token as `Authorization: Bearer <token>`; in `/docs`, paste it into **Authorize**. You need a browser to get one, since `/docs` can't run a passkey ceremony. Protected routes take the user as `user: CurrentUser` (from `app/api/deps.py`), which responds 401 when the token is missing, invalid or expired.
 
 ## Checks
@@ -95,6 +112,6 @@ uv run ruff format .           # format
 uv run mypy                    # type check (strict)
 ```
 
-The tests need Postgres (`make db`). They apply the migrations to the `DATABASE_URL` database, then run each test in a transaction that is rolled back afterwards, so they leave no data behind. Passkey tests use a software authenticator (`tests/authenticator.py`) that creates real credentials and signatures, so the WebAuthn verification runs unmocked.
+The tests need Postgres and Redis (`make db`). They apply the migrations to the `DATABASE_URL` database, then run each test in a transaction that is rolled back afterwards, so they leave no data behind. They empty the Redis database before and after each test: by default database 1, apart from the development server's database 0, or whichever `REDIS_URL` names. Emails go to a fake sender (`tests/emails.py`) that keeps them for the tests to read. Passkey tests use a software authenticator (`tests/authenticator.py`) that creates real credentials and signatures, so the WebAuthn verification runs unmocked.
 
 `make test` and `make lint` from the repository root run these along with the rest of the repository's checks.

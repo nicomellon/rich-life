@@ -1,6 +1,8 @@
 """Helpers that create accounts through the passkey endpoints, for tests that need a
 registered or signed-in user."""
 
+from collections.abc import Mapping
+
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from pydantic import BaseModel
@@ -14,11 +16,16 @@ EMAIL = "ada@example.com"
 OTHER_EMAIL = "grace@example.com"
 
 
-def post_model(client: TestClient, path: str, model: BaseModel) -> Response:
+def post_model(
+    client: TestClient,
+    path: str,
+    model: BaseModel,
+    headers: Mapping[str, str] | None = None,
+) -> Response:
     return client.post(
         path,
         content=model.model_dump_json(),
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", **(headers or {})},
     )
 
 
@@ -48,3 +55,14 @@ def register(
 
 def auth_header(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def request_passkey_addition_options(
+    client: TestClient, signed_in_headers: Mapping[str, str]
+) -> RegistrationOptions:
+    """Creation options for another passkey on the signed-in account."""
+    response = client.post(
+        "/api/v1/auth/register-challenge", headers=dict(signed_in_headers)
+    )
+    assert response.status_code == 200, response.text
+    return RegistrationOptions.model_validate(response.json())

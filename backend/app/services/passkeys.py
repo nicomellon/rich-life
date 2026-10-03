@@ -26,6 +26,7 @@ from webauthn.helpers.structs import (
     AuthenticatorAttestationResponse,
     AuthenticatorSelectionCriteria,
     AuthenticatorTransport,
+    PublicKeyCredentialDescriptor,
     RegistrationCredential,
     ResidentKeyRequirement,
     UserVerificationRequirement,
@@ -61,7 +62,6 @@ def start_registration(db: Session, *, email: Email) -> RegistrationOptions:
     if db.scalar(select(User.id).where(User.email == email)) is not None:
         raise EmailAlreadyRegisteredError(email)
 
-    settings = get_settings()
     user_handle = secrets.token_bytes(32)
     challenge = _issue_challenge(
         db,
@@ -69,39 +69,51 @@ def start_registration(db: Session, *, email: Email) -> RegistrationOptions:
         email=email,
         user_handle=user_handle,
     )
-    registration_options = generate_registration_options(
-        rp_id=settings.webauthn_rp_id,
-        rp_name=settings.webauthn_rp_name,
-        user_id=user_handle,
-        user_name=email,
-        challenge=challenge,
-        # A discoverable credential lets the user sign in later without typing their
-        # email.
-        authenticator_selection=AuthenticatorSelectionCriteria(
-            resident_key=ResidentKeyRequirement.REQUIRED,
-            user_verification=UserVerificationRequirement.REQUIRED,
-        ),
+    return _registration_options(challenge, user_handle=user_handle, user_name=email)
+
+
+def start_passkey_addition(db: Session, user: User) -> RegistrationOptions:
+    """Return creation options for another passkey on a signed-in user's account."""
+    challenge = _issue_challenge(
+        db,
+        ChallengeKind.REGISTRATION,
+        user_handle=user.webauthn_user_handle,
+        user_id=user.id,
     )
-    return RegistrationOptions.model_validate(
-        options_to_json_dict(registration_options)
+    existing_passkeys = db.scalars(select(Passkey).where(Passkey.user_id == user.id))
+    return _registration_options(
+        challenge,
+        user_handle=user.webauthn_user_handle,
+        user_name=user.email,
+        # The browser refuses an authenticator that already holds one of these, so a
+        # device isn't registered twice.
+        exclude_credentials=[
+            PublicKeyCredentialDescriptor(
+                id=passkey.credential_id,
+                transports=_known_transports(passkey.transports),
+            )
+            for passkey in existing_passkeys
+        ],
     )
 
 
-def finish_registration(db: Session, registration: RegistrationResponse) -> User:
-    """Verify the new passkey and create its account, with the default spending
-    plan."""
+def finish_registration(
+    db: Session, registration: RegistrationResponse, signed_in_user: User | None
+) -> User:
+    """Verify the new passkey. Signed in, add it to the user's account; otherwise
+    create its account, with the default spending plan. A challenge only works for
+    the kind of registration it was issued for, and for the same user."""
     settings = get_settings()
-    transports = [
-        AuthenticatorTransport(transport)
-        for transport in registration.response.transports
-        if transport in KNOWN_TRANSPORTS
-    ]
+    transports = _known_transports(registration.response.transports)
     try:
         issued_challenge = _consume_challenge(
             db,
             ChallengeKind.REGISTRATION,
             registration.response.client_data_json,
         )
+        signed_in_user_id = signed_in_user.id if signed_in_user else None
+        if issued_challenge.user_id != signed_in_user_id:
+            raise PasskeyVerificationError("Challenge issued for another account")
         verified_registration = verify_registration_response(
             credential=RegistrationCredential(
                 id=bytes_to_base64url(registration.id),
@@ -120,6 +132,15 @@ def finish_registration(db: Session, registration: RegistrationResponse) -> User
         )
     except (WebAuthnException, ValueError) as exc:
         raise PasskeyVerificationError from exc
+    passkey = Passkey(
+        credential_id=verified_registration.credential_id,
+        public_key=verified_registration.credential_public_key,
+        sign_count=verified_registration.sign_count,
+        transports=[transport.value for transport in transports],
+    )
+    if signed_in_user is not None:
+        return _add_passkey(db, signed_in_user, passkey)
+
     # Read before committing: a failed commit expires the challenge row, which no longer
     # exists.
     email = issued_challenge.email
@@ -128,15 +149,8 @@ def finish_registration(db: Session, registration: RegistrationResponse) -> User
 
     user = User(email=email, webauthn_user_handle=user_handle)
     db.add(user)
-    db.add(
-        Passkey(
-            user=user,
-            credential_id=verified_registration.credential_id,
-            public_key=verified_registration.credential_public_key,
-            sign_count=verified_registration.sign_count,
-            transports=[transport.value for transport in transports],
-        )
-    )
+    passkey.user = user
+    db.add(passkey)
     # The column defaults give every new user the 50/10/20/20 plan.
     db.add(SpendingPlan(user=user))
     try:
@@ -211,12 +225,62 @@ def finish_authentication(db: Session, authentication: AuthenticationResponse) -
     return passkey.user
 
 
+def _add_passkey(db: Session, user: User, passkey: Passkey) -> User:
+    passkey.user = user
+    db.add(passkey)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        # The credential is already registered, to this account or another one.
+        db.rollback()
+        raise PasskeyVerificationError("Credential already registered") from exc
+    return user
+
+
+def _registration_options(
+    challenge: bytes,
+    *,
+    user_handle: bytes,
+    user_name: str,
+    exclude_credentials: list[PublicKeyCredentialDescriptor] | None = None,
+) -> RegistrationOptions:
+    settings = get_settings()
+    registration_options = generate_registration_options(
+        rp_id=settings.webauthn_rp_id,
+        rp_name=settings.webauthn_rp_name,
+        user_id=user_handle,
+        user_name=user_name,
+        challenge=challenge,
+        exclude_credentials=exclude_credentials,
+        # A discoverable credential lets the user sign in later without typing their
+        # email.
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            resident_key=ResidentKeyRequirement.REQUIRED,
+            user_verification=UserVerificationRequirement.REQUIRED,
+        ),
+    )
+    return RegistrationOptions.model_validate(
+        options_to_json_dict(registration_options)
+    )
+
+
+def _known_transports(transports: list[str]) -> list[AuthenticatorTransport]:
+    """The transports py_webauthn knows, leaving out any newer ones a browser
+    reports."""
+    return [
+        AuthenticatorTransport(transport)
+        for transport in transports
+        if transport in KNOWN_TRANSPORTS
+    ]
+
+
 def _issue_challenge(
     db: Session,
     kind: ChallengeKind,
     *,
     email: Email | None = None,
     user_handle: bytes | None = None,
+    user_id: int | None = None,
 ) -> bytes:
     now = datetime.now(UTC)
     # Housekeeping: challenges that were never answered pile up otherwise.
@@ -228,6 +292,7 @@ def _issue_challenge(
             kind=kind,
             email=email,
             user_handle=user_handle,
+            user_id=user_id,
             expires_at=now + CHALLENGE_TTL,
         )
     )
